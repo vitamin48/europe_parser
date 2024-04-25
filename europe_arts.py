@@ -12,6 +12,8 @@ import json
 from bs4 import BeautifulSoup
 import traceback
 
+ADDRESS_SHOP = 'Брянск-58, ул. Горбатова, 18'
+
 
 class bcolors:
     HEADER = '\033[95m'
@@ -58,27 +60,52 @@ class Europa:
         try:
             print('Устанавливаем город')
             self.page.goto("https://europa-market.ru/")
-            # Изменить город?
-            change_sity = '//*[@id="__layout"]/div/div[1]/div/div[1]/div/button[2]/span'
-            change_sity_btn = self.page.wait_for_selector(change_sity)
-            change_sity_btn.click()
-            # Брянск
-            br_btn = ('#__layout > div > div.header-under > div > div.v--modal-overlay.scrollable > div > '
-                   'div.v--modal-box.native-modal.v--modal > div > div > div.city-wrapper__options > '
-                   'div.city-wrapper__presence > div > a:nth-child(2)')
-            accept_br_city = self.page.wait_for_selector(br_btn)
-            accept_br_city.click()
-            # Изменить адрес доставки
-            address_btn = '//*[@id="__layout"]/div/div[1]/div/div[1]/button[2]'
-            wait_address_btn = self.page.wait_for_selector(address_btn)
+            self.page.get_by_role("button", name="Нет, выбрать другой").click()
+            self.page.get_by_role("link", name="Брянск").click()
             time.sleep(5)
-            wait_address_btn.click()
-            samovuzov_btn = ('#modals-container > div > div > div.v--modal-box.v--modal > '
-                             'div > div.cartography-modal__header > div.cartography-modal__header-text > '
-                             'div.cartography-modal__header-button.cartography-modal__header-button--active')
+            self.page.get_by_role("button", name="Адрес доставки").click()
+            self.page.get_by_text("Самовывоз").click()
+            self.page.get_by_placeholder("Выберите магазин из списка").click()
+            self.page.get_by_role("option", name="Брянск-58, ул. Горбатова,").click()
+            self.page.get_by_role("button", name="Готово").click()
 
-            print('time.sleep(30)')
-            time.sleep(30)
+            # self.page.goto("https://europa-market.ru/")
+            # # Изменить город?
+            # change_sity = '//*[@id="__layout"]/div/div[1]/div/div[1]/div/button[2]/span'
+            # change_sity_btn = self.page.wait_for_selector(change_sity)
+            # change_sity_btn.click()
+            # # Брянск
+            # br_btn = ('#__layout > div > div.header-under > div > div.v--modal-overlay.scrollable > div > '
+            #           'div.v--modal-box.native-modal.v--modal > div > div > div.city-wrapper__options > '
+            #           'div.city-wrapper__presence > div > a:nth-child(2)')
+            # accept_br_city = self.page.wait_for_selector(br_btn)
+            # accept_br_city.click()
+            # time.sleep(5)
+            # # Изменить адрес доставки
+            # addr_btn = self.page.locator('text=Адрес доставки')
+            # addr_btn.wait_for(timeout=9000, state="visible")
+            # addr_btn.click()
+            # # Самовывоз
+            # pickup = self.page.locator('text=Самовывоз')
+            # pickup.wait_for(timeout=9000, state="visible")
+            # pickup.click()
+            # time.sleep(5)
+            # # Вводим адрес и нажимаем ENTER
+            # change_addr = self.page.locator('text=Выберите магазин из списка')
+            # change_addr.click()
+
+
+            # dropdown_button_locator = self.page.locator('#vs9__combobox > div.vs__selected-options > input')
+            # dropdown_button_locator.click()
+            # address_locator = self.page.locator(f"text={ADDRESS_SHOP}")
+            # address_locator.click()
+
+            #
+            # input_locator_address = self.page.locator('#vs9__combobox > div.vs__selected-options > input')
+            # input_locator_address.fill(ADDRESS_SHOP)
+            # input_locator_address.press('Enter')
+            print('time.sleep(10)')
+            time.sleep(10)
         except Exception as exp:
             print(exp)
             print(traceback.format_exc())

@@ -68,44 +68,7 @@ class Europa:
             self.page.get_by_placeholder("Выберите магазин из списка").click()
             self.page.get_by_role("option", name="Брянск-58, ул. Горбатова,").click()
             self.page.get_by_role("button", name="Готово").click()
-
-            # self.page.goto("https://europa-market.ru/")
-            # # Изменить город?
-            # change_sity = '//*[@id="__layout"]/div/div[1]/div/div[1]/div/button[2]/span'
-            # change_sity_btn = self.page.wait_for_selector(change_sity)
-            # change_sity_btn.click()
-            # # Брянск
-            # br_btn = ('#__layout > div > div.header-under > div > div.v--modal-overlay.scrollable > div > '
-            #           'div.v--modal-box.native-modal.v--modal > div > div > div.city-wrapper__options > '
-            #           'div.city-wrapper__presence > div > a:nth-child(2)')
-            # accept_br_city = self.page.wait_for_selector(br_btn)
-            # accept_br_city.click()
-            # time.sleep(5)
-            # # Изменить адрес доставки
-            # addr_btn = self.page.locator('text=Адрес доставки')
-            # addr_btn.wait_for(timeout=9000, state="visible")
-            # addr_btn.click()
-            # # Самовывоз
-            # pickup = self.page.locator('text=Самовывоз')
-            # pickup.wait_for(timeout=9000, state="visible")
-            # pickup.click()
-            # time.sleep(5)
-            # # Вводим адрес и нажимаем ENTER
-            # change_addr = self.page.locator('text=Выберите магазин из списка')
-            # change_addr.click()
-
-
-            # dropdown_button_locator = self.page.locator('#vs9__combobox > div.vs__selected-options > input')
-            # dropdown_button_locator.click()
-            # address_locator = self.page.locator(f"text={ADDRESS_SHOP}")
-            # address_locator.click()
-
-            #
-            # input_locator_address = self.page.locator('#vs9__combobox > div.vs__selected-options > input')
-            # input_locator_address.fill(ADDRESS_SHOP)
-            # input_locator_address.press('Enter')
-            print('time.sleep(10)')
-            time.sleep(10)
+            print(f'Успешно установлен адрес: {ADDRESS_SHOP}')
         except Exception as exp:
             print(exp)
             print(traceback.format_exc())
@@ -113,9 +76,11 @@ class Europa:
     def get_arts_from_catalogs(self):
         for catalog in self.catalogs:
             print(f'Работаю с каталогом: {catalog}')
+            self.page.goto(catalog)
 
     def start(self):
         self.set_city()
+        self.get_arts_from_catalogs()
 
 
 def main():

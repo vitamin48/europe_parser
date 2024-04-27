@@ -1,15 +1,10 @@
 """Скрипт на основе playwright считывает каталоги europa-market.ru из файла catalogs.txt и собирает ссылки со всех
 имеющихся страниц в файл out/europa_articles.txt с учетом цены или без. Остатки приблизительны.
 Особенность: исключить брэнд Собственное производство"""
-import time
 
-from tqdm import tqdm
+import time
 import datetime
-import requests
-from pathlib import Path
 from playwright.sync_api import Playwright, sync_playwright, expect
-import json
-from bs4 import BeautifulSoup
 import traceback
 
 ADDRESS_SHOP = 'Брянск-58, ул. Горбатова, 18'
@@ -34,6 +29,13 @@ def read_catalogs_from_txt():
     return catalogs
 
 
+def add_to_txt_file_url_product(urls):
+    with open('out/url_list_product.txt', 'a') as output:
+        print('Добавляю в файл out/url_list_product.txt')
+        for row in urls:
+            output.write(str(f'{row}') + '\n')
+
+
 class Europa:
     playwright = None
     browser = None
@@ -41,8 +43,6 @@ class Europa:
     context = None
 
     def __init__(self, playwright):
-        self.res_list = []
-        self.res_dict = {'name': None, 'url': None}
         self.catalogs = read_catalogs_from_txt()
         self.set_playwright_config(playwright=playwright)
 
@@ -69,14 +69,48 @@ class Europa:
             self.page.get_by_role("option", name="Брянск-58, ул. Горбатова,").click()
             self.page.get_by_role("button", name="Готово").click()
             print(f'Успешно установлен адрес: {ADDRESS_SHOP}')
+            time.sleep(5)
         except Exception as exp:
             print(exp)
             print(traceback.format_exc())
+
+    def view60(self):
+        """Делаем вывод товаров по 60 шт на странице"""
+        self.page.get_by_role("button", name="Выводить по").click()
+        time.sleep(3)
+        self.page.get_by_role("button", name="Выводить по 60").click()
+        time.sleep(5)
+
+    def get_urls_from_page(self):
+        # Извлечение ссылок на товары
+        products = self.page.query_selector_all('.card-product-content__title')
+        # Сохранение ссылок в списке
+        links = [link.get_attribute('href') for link in products]
+        # Сохранение имен в списке
+        names = [name.text_content() for name in products]
+        if len(links) != len(names):
+            input('ОШИБКА! Количество имен и ссылок на странице не совпадают')
+        # Объединение имен и ссылок с табуляцией
+        combined_data = [f"{name.strip()}\thttps://europa-market.ru{link}" for name, link in zip(names, links)]
+        add_to_txt_file_url_product(combined_data)
+        return len(links)
+
+    def paginator(self):
+        """Пролистываем страницы, пока на странице не будет менее 60 товаров."""
+        len_links = self.get_urls_from_page()
+        if len_links < 60:
+            return
+        else:
+            self.page.locator(".ui-pagination__pagination > div:nth-child(3) > .icon").click()
+            time.sleep(2)
+            self.paginator()
 
     def get_arts_from_catalogs(self):
         for catalog in self.catalogs:
             print(f'Работаю с каталогом: {catalog}')
             self.page.goto(catalog)
+            self.view60()
+            self.paginator()
 
     def start(self):
         self.set_city()
@@ -92,6 +126,7 @@ def main():
         print(f'Успешно')
     except Exception as exp:
         print(exp)
+        print(traceback.format_exc())
         # send_logs_to_telegram(message=f'Произошла ошибка!\n\n\n{exp}')
     t2 = datetime.datetime.now()
     print(f'Finish: {t2}, TIME: {t2 - t1}')

@@ -15,7 +15,6 @@ import time
 import re
 from tqdm import tqdm
 from pathlib import Path
-import pandas as pd
 import json
 import traceback
 from bs4 import BeautifulSoup
@@ -45,6 +44,24 @@ def write_json(res_dict):
         json.dump(res_dict, json_file, indent=2, ensure_ascii=False)
 
 
+def send_logs_to_telegram(message):
+    import platform
+    import socket
+    import os
+
+    platform = platform.system()
+    hostname = socket.gethostname()
+    user = os.getlogin()
+
+    bot_token = '6456958617:AAF8thQveHkyLLtWtD02Rq1UqYuhfT4LoTc'
+    chat_id = '128592002'
+
+    url = f'https://api.telegram.org/bot{bot_token}/sendMessage'
+    data = {"chat_id": chat_id, "text": message + f'\n\n{platform}\n{hostname}\n{user}'}
+    response = requests.post(url, data=data)
+    return response.json()
+
+
 class EuropaParser:
     playwright = None
     browser = None
@@ -67,6 +84,12 @@ class EuropaParser:
         self.page = self.context.new_page()
         self.page.add_init_script(js)
 
+    def check_ddos(self, title):
+        """Проверяем, сработала ли DDOS защита, т.е. смотрим текст, что в заголовке"""
+        if title == 'DDoS-Guard':
+            send_logs_to_telegram(message=f'Обнаружена защита от DDOS! Скрипт на паузе.')
+            input(f'{bcolors.BOLD}Обнаружена защита от DDOS!{bcolors.ENDC} {datetime.datetime.now()}')
+
     def set_city(self):
         try:
             print('Устанавливаем город')
@@ -86,7 +109,23 @@ class EuropaParser:
             print(traceback.format_exc())
 
     def get_data_by_page(self, product):
+        print(product)
         soup = BeautifulSoup(self.page.content(), 'lxml')
+        # Цена и наличие
+        price_tag = soup.find('span', itemprop='price')
+        if price_tag:
+            price = round(float(price_tag.text.strip()))
+        else:
+            absent_tag = soup.find('div', class_='product-overview__price')
+            if absent_tag and absent_tag.find('h2', class_='product-overview__absent'):
+                print(f'{bcolors.WARNING}Нет в наличии{bcolors.ENDC}')
+                add_bad_req(art=product, error='Нет_в_наличии')
+                return
+            else:
+                print(f'{bcolors.FAIL}Информация о наличии или цене товара не найдена. ВООЗМОЖНА ЗАЩИТА{bcolors.ENDC}')
+                add_bad_req(art=product, error='Информация_о_наличии_или_цене_не_найдена_вероятно_DDOS')
+                input()
+                return
         # Код
         code = product.split('-')[-1]
         # Имя
@@ -99,23 +138,22 @@ class EuropaParser:
                 stock = count_element.text.strip()
                 stock = int(re.search(r'\d+', stock).group())
             else:
-                stock = 0
+                stock = '-'
         else:
-            stock = 0
-        # Цена
-        price = round(float(soup.find('span', itemprop='price').text.strip()))
+            stock = '--'
+            add_bad_req(art=product, error='Не_найден_блок_с_остатками')
         # Описание
         description_element = soup.find('div', class_='product-page__description-text')
         if description_element:
             description = description_element.text.strip()
             if description == '':
                 description = '-'
-                print("Описание товара не найдено, но блок с описанием найден")
-                add_bad_req(art=product, error='description_not_found_no_description_element')
+                # print("Описание товара не найдено, но блок с описанием найден")
+                # add_bad_req(art=product, error='Описание_товара_не_найдено_но_блок_с_описанием_найден')
         else:
             description = '-'
             print("Описание товара не найдено.")
-            add_bad_req(art=product, error='description_not_found_no_description_element')
+            add_bad_req(art=product, error='Описание_товара_не_найдено')
         # Находим блок с характеристиками
         characteristics_dict = {}
         characteristics_block = soup.find('div', class_='product-description-list')
@@ -138,8 +176,13 @@ class EuropaParser:
                 if image_src:
                     image_links.append(image_src)
         image_links = [x.split('?v=')[0] for x in image_links]
+        "Формируем результирующий словарь с данными"
+        self.res_dict[code] = {'name': name, 'price': price, 'stock': stock, 'description': description,
+                               'characteristics': characteristics_dict,
+                               'img_url': image_links, 'art_url': product}
+        write_json(res_dict=self.res_dict)
 
-        print()
+        # print()
 
     def get_data_from_catalogs(self):
         """Перебор по ссылкам на товары, получение данных"""
@@ -148,6 +191,9 @@ class EuropaParser:
             while retry_count > 0:
                 try:
                     self.page.goto(product, timeout=30000)
+                    # print(self.page.title())
+                    self.check_ddos(title=self.page.title())
+                    # input(f'{bcolors.OKBLUE}DDOS{bcolors.ENDC}') if self.check_ddos(title=self.page.title()) else None
                     self.get_data_by_page(product)
                     break
                 except Exception as exp:
@@ -160,11 +206,11 @@ class EuropaParser:
                     else:
                         print(f'{bcolors.FAIL}Превышено количество попыток для товара, в файл добавлено:{bcolors.ENDC}'
                               f'\n{product}')
-                        add_bad_req(product, error='Превышено количество попыток для товара')
+                        add_bad_req(product, error='Превышено_количество_попыток_для_товара')
                         break
 
     def start(self):
-        # self.set_city()
+        self.set_city()
         self.get_data_from_catalogs()
 
 
@@ -179,7 +225,7 @@ def main():
         print(exp)
         traceback_str = traceback.format_exc()
         print(traceback_str)
-        # send_logs_to_telegram(message=f'Произошла ошибка!\n\n\n{exp}\n\n{traceback_str}')
+        send_logs_to_telegram(message=f'Произошла ошибка!\n\n\n{exp}\n\n{traceback_str}')
     t2 = datetime.datetime.now()
     print(f'Finish: {t2}, TIME: {t2 - t1}')
     # send_logs_to_telegram(message=f'Finish: {t2}, TIME: {t2 - t1}')

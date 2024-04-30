@@ -53,7 +53,7 @@ class EuropaParser:
 
     def __init__(self, playwright):
         self.res_list = []
-        self.res_dict = {'name': None, 'url': None}
+        self.res_dict = {}
         self.product_list = read_product_list_from_txt()
         self.set_playwright_config(playwright=playwright)
 
@@ -104,8 +104,42 @@ class EuropaParser:
             stock = 0
         # Цена
         price = round(float(soup.find('span', itemprop='price').text.strip()))
-        print()
+        # Описание
+        description_element = soup.find('div', class_='product-page__description-text')
+        if description_element:
+            description = description_element.text.strip()
+            if description == '':
+                description = '-'
+                print("Описание товара не найдено, но блок с описанием найден")
+                add_bad_req(art=product, error='description_not_found_no_description_element')
+        else:
+            description = '-'
+            print("Описание товара не найдено.")
+            add_bad_req(art=product, error='description_not_found_no_description_element')
+        # Находим блок с характеристиками
+        characteristics_dict = {}
+        characteristics_block = soup.find('div', class_='product-description-list')
+        if characteristics_block:
+            characteristics_lines = characteristics_block.find_all('div', class_='product-description-list__line')
+            for line in characteristics_lines:
+                left_side = line.find(class_='product-description-list__side--side-left').text.strip()
+                right_side = line.find(class_='product-description-list__side--side-right').text.strip()
+                characteristics_dict[left_side] = right_side
+        else:
+            print("Характеристики товара не найдены.")
+            add_bad_req(art=product, error='characteristics_not_found')
+        # Находим блок с изображениями
+        image_block = soup.find('div', class_='product-image-slider__preview')
+        image_links = []
+        if image_block:
+            image_elements = image_block.find_all('img')
+            for image_element in image_elements:
+                image_src = image_element.get('src')
+                if image_src:
+                    image_links.append(image_src)
+        image_links = [x.split('?v=')[0] for x in image_links]
 
+        print()
 
     def get_data_from_catalogs(self):
         """Перебор по ссылкам на товары, получение данных"""

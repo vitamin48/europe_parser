@@ -87,8 +87,11 @@ class EuropaParser:
     def check_ddos(self, title):
         """Проверяем, сработала ли DDOS защита, т.е. смотрим текст, что в заголовке"""
         if title == 'DDoS-Guard':
-            send_logs_to_telegram(message=f'Обнаружена защита от DDOS! Скрипт на паузе.')
-            input(f'{bcolors.BOLD}Обнаружена защита от DDOS!{bcolors.ENDC} {datetime.datetime.now()}')
+            return True
+        else:
+            return False
+            # send_logs_to_telegram(message=f'Обнаружена защита от DDOS! Скрипт на паузе.')
+            # input(f'{bcolors.BOLD}Обнаружена защита от DDOS!{bcolors.ENDC} {datetime.datetime.now()}')
 
     def set_city(self):
         try:
@@ -187,25 +190,44 @@ class EuropaParser:
     def get_data_from_catalogs(self):
         """Перебор по ссылкам на товары, получение данных"""
         for product in tqdm(self.product_list):
-            retry_count = 3
-            while retry_count > 0:
+            retry_count = 0  # Количество попыток загрузки страницы
+            max_retries = 4  # Количество попыток для DDOS
+            while retry_count < max_retries:
                 try:
+                    # Переход к странице товара
                     self.page.goto(product, timeout=30000)
-                    # print(self.page.title())
-                    self.check_ddos(title=self.page.title())
-                    # input(f'{bcolors.OKBLUE}DDOS{bcolors.ENDC}') if self.check_ddos(title=self.page.title()) else None
+                    # Проверка на наличие блокировки DDOS
+                    if self.check_ddos(title=self.page.title()):
+                        # Определение времени ожидания в зависимости от retry_count
+                        if retry_count == 0:
+                            print('DDOS. Ждем 40 с')
+                            time.sleep(40)
+                        elif retry_count == 1:
+                            print('DDOS. Ждем 100 с')
+                            time.sleep(100)
+                        elif retry_count == 2:
+                            print('DDOS. Ждем 1000 с')
+                            time.sleep(1000)
+                        else:
+                            # В четвертый раз просим ввод от пользователя
+                            send_logs_to_telegram(message=f'Обнаружена защита от DDOS! Скрипт на паузе.')
+                            input(f'{bcolors.BOLD}Обнаружена защита от DDOS!{bcolors.ENDC} {datetime.datetime.now()}')
+                        retry_count += 1
+                        continue
+                    # Если нет блокировки, обрабатываем данные страницы
                     self.get_data_by_page(product)
                     break
                 except Exception as exp:
+                    # Обработка исключений при загрузке страницы
                     traceback_str = traceback.format_exc()
-                    print(f'{bcolors.WARNING}Ошибка при загрузке страницы {product}: {bcolors.ENDC}\n{str(exp)}\n\n'
-                          f'{traceback_str}')
-                    retry_count -= 1
-                    if retry_count > 0:
-                        print(f'Повторная попытка ({retry_count} осталось)')
+                    print(f'Ошибка при загрузке страницы {product}:\n{exp}\n{traceback_str}')
+                    # Уменьшаем retry_count на 1
+                    retry_count += 1
+                    if retry_count < max_retries:
+                        print(f'Повторная попытка загрузки ({max_retries - retry_count} осталось)')
                     else:
-                        print(f'{bcolors.FAIL}Превышено количество попыток для товара, в файл добавлено:{bcolors.ENDC}'
-                              f'\n{product}')
+                        # Если превышено количество попыток
+                        print(f'Превышено количество попыток для товара, в файл добавлено: {product}')
                         add_bad_req(product, error='Превышено_количество_попыток_для_товара')
                         break
 

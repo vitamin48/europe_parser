@@ -6,6 +6,7 @@ import time
 import datetime
 from playwright.sync_api import Playwright, sync_playwright, expect
 import traceback
+from tqdm import tqdm
 
 ADDRESS_SHOP = 'Брянск-58, ул. Горбатова, 18'
 
@@ -62,7 +63,7 @@ class Europa:
             self.page.goto("https://europa-market.ru/")
             self.page.get_by_role("button", name="Нет, выбрать другой").click()
             self.page.get_by_role("link", name="Брянск").click()
-            time.sleep(5)
+            time.sleep(7)
             self.page.get_by_role("button", name="Адрес доставки").click()
             self.page.get_by_text("Самовывоз").click()
             self.page.get_by_placeholder("Выберите магазин из списка").click()
@@ -77,9 +78,16 @@ class Europa:
     def view60(self):
         """Делаем вывод товаров по 60 шт на странице"""
         self.page.get_by_role("button", name="Выводить по").click()
-        time.sleep(3)
+        time.sleep(10)
         self.page.get_by_role("button", name="Выводить по 60").click()
         time.sleep(5)
+
+    def check_ddos(self, title):
+        """Проверяем, сработала ли DDOS защита, т.е. смотрим текст, что в заголовке"""
+        if title == 'DDoS-Guard':
+            return True
+        else:
+            return False
 
     def get_urls_from_page(self):
         # Извлечение ссылок на товары
@@ -102,18 +110,25 @@ class Europa:
             return
         else:
             self.page.locator(".ui-pagination__pagination > div:nth-child(3) > .icon").click()
-            time.sleep(2)
+            time.sleep(3)
             self.paginator()
 
     def get_arts_from_catalogs(self):
-        for catalog in self.catalogs:
+        for catalog in tqdm(self.catalogs):
             print(f'Работаю с каталогом: {catalog}')
             self.page.goto(catalog)
-            self.view60()
+            time.sleep(5)
+            if self.check_ddos(title=self.page.title()):
+                print(f'{bcolors.FAIL}DDOS. Ждем 40 с{bcolors.ENDC}')
+                time.sleep(40)
+                self.page.goto(catalog)
+            # self.view60()
             self.paginator()
 
     def start(self):
         self.set_city()
+        self.page.goto('https://europa-market.ru/catalog/sobstvennaya-torgovaya-marka-3')
+        self.view60()
         self.get_arts_from_catalogs()
 
 

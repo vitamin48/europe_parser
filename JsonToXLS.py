@@ -6,7 +6,7 @@ import pandas as pd
 
 from openpyxl.utils import get_column_letter
 
-FILE_NAME_JSON = 'result_merge_data.json'  # out/FILE_NAME_JSON
+FILE_NAME_JSON = 'data.json'  # out/FILE_NAME_JSON
 
 
 def read_json():
@@ -44,6 +44,7 @@ def create_df_by_dict(data_dict):
         characteristics = value.get("characteristics", {})
         brand = characteristics.get("Бренд", characteristics.get("Торговая марка", "NoName"))
         country = characteristics.get("Страна изготовитель", "Китай")
+        ovk = characteristics.get("Объем/вес/количество", '-')
         # Обработка ВхШхГ
         dimensions = characteristics.get("ВхШхГ", "0.0х0.0х0.0")
         height, width, length = map(lambda x: round(float(x) * 10), dimensions.split("х"))
@@ -72,7 +73,8 @@ def create_df_by_dict(data_dict):
             "Ширина, мм": width,
             "Высота, мм": height,
             "Длина, мм": length,
-            "Характеристики": str(characteristics)
+            "Характеристики": str(characteristics),
+            "ОВК": ovk
         }
         rows.append(row)
     # Создание DataFrame из списка строк
@@ -93,9 +95,10 @@ def create_df_by_dict(data_dict):
     # Добавляем столбец НДС Не облагается
     df_filtered["НДС"] = "Не облагается"
     # Задаем порядок столбцов
-    desired_order = ['Артикул', 'Название', 'Цена для OZON', 'Цена до скидки', 'НДС', 'Цена Европы', 'Ширина, мм',
-                     'Высота, мм', 'Длина, мм', 'Ссылка на главное фото товара', 'Ссылки на другие фото товара',
-                     'Бренд', 'ArtNumber', 'Описание', 'Страна', 'art_url']
+    desired_order = ['Артикул', 'Название', 'Цена для OZON', 'Цена до скидки', 'НДС', 'Остатки', 'Цена Европы',
+                     'ОВК', 'Ширина, мм', 'Высота, мм', 'Длина, мм', 'Ссылка на главное фото товара',
+                     'Ссылки на другие фото товара', 'Бренд', 'ArtNumber', 'Описание', 'Страна',
+                     'Характеристики', 'art_url']
     result_df = df_filtered[desired_order]
     return result_df
 
@@ -116,6 +119,7 @@ def create_xls(df):
         # Корректировка ширины столбцов
         worksheet_ozon.column_dimensions[get_column_letter(df.columns.get_loc('Название') + 1)].width = 30
         worksheet_ozon.column_dimensions[get_column_letter(df.columns.get_loc('Описание') + 1)].width = 30
+        worksheet_ozon.column_dimensions[get_column_letter(df.columns.get_loc('Характеристики') + 1)].width = 30
         worksheet_ozon.column_dimensions[
             get_column_letter(df.columns.get_loc('Ссылка на главное фото товара') + 1)].width = 30
         worksheet_ozon.column_dimensions[

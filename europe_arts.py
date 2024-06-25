@@ -63,14 +63,14 @@ class Europa:
             self.page.goto("https://europa-market.ru/")
             self.page.get_by_role("button", name="Нет, выбрать другой").click()
             self.page.get_by_role("link", name="Брянск").click()
-            time.sleep(7)
+            time.sleep(10)
             self.page.get_by_role("button", name="Адрес доставки").click()
             self.page.get_by_text("Самовывоз").click()
             self.page.get_by_placeholder("Выберите магазин из списка").click()
             self.page.get_by_role("option", name="Брянск-58, ул. Горбатова,").click()
             self.page.get_by_role("button", name="Готово").click()
             print(f'Успешно установлен адрес: {ADDRESS_SHOP}')
-            time.sleep(5)
+            time.sleep(10)
         except Exception as exp:
             print(exp)
             print(traceback.format_exc())
@@ -110,17 +110,17 @@ class Europa:
             return
         else:
             self.page.locator(".ui-pagination__pagination > div:nth-child(3) > .icon").click()
-            time.sleep(3)
+            time.sleep(10)
             self.paginator()
 
     def get_arts_from_catalogs(self):
         for catalog in tqdm(self.catalogs):
             print(f'Работаю с каталогом: {catalog}')
             self.page.goto(catalog)
-            time.sleep(5)
+            time.sleep(10)
             if self.check_ddos(title=self.page.title()):
-                print(f'{bcolors.FAIL}DDOS. Ждем 40 с{bcolors.ENDC}')
-                time.sleep(40)
+                print(f'{bcolors.FAIL}DDOS. Ждем 60 с{bcolors.ENDC}')
+                time.sleep(60)
                 self.page.goto(catalog)
             # self.view60()
             self.paginator()

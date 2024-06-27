@@ -200,14 +200,14 @@ class EuropaParser:
                     if self.check_ddos(title=self.page.title()):
                         # Определение времени ожидания в зависимости от retry_count
                         if retry_count == 0:
-                            print('DDOS. Ждем 40 с')
-                            time.sleep(40)
+                            print('DDOS. Ждем 60 с')
+                            time.sleep(60)
                         elif retry_count == 1:
-                            print('DDOS. Ждем 100 с')
-                            time.sleep(100)
+                            print('DDOS. Ждем 500 с')
+                            time.sleep(500)
                         elif retry_count == 2:
-                            print('DDOS. Ждем 1000 с')
-                            time.sleep(1000)
+                            print('DDOS. Ждем 3000 с')
+                            time.sleep(3000)
                         else:
                             # В четвертый раз просим ввод от пользователя
                             send_logs_to_telegram(message=f'Обнаружена защита от DDOS! Скрипт на паузе.')

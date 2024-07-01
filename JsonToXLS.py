@@ -6,7 +6,7 @@ import pandas as pd
 
 from openpyxl.utils import get_column_letter
 
-FILE_NAME_JSON = 'data.json'  # out/FILE_NAME_JSON
+FILE_NAME_JSON = 'result_merge_data.json'  # out/FILE_NAME_JSON
 
 
 def read_json():

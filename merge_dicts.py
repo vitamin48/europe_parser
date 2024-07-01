@@ -21,7 +21,7 @@ for filename in os.listdir(json_folder_path):
             json_content = json.load(file)
 
         # Объединяем данные из текущего файла в общий словарь
-        merged_dict.update(json_content)
+        merged_dict.update(json_content)  # доработать показ дублирующихся значений
 
 with open('out\\result_merge_data.json', 'w', encoding='utf-8') as json_file:
     json.dump(merged_dict, json_file, indent=2, ensure_ascii=False)

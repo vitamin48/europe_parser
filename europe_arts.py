@@ -1,5 +1,6 @@
 """Скрипт на основе playwright считывает каталоги europa-market.ru из файла catalogs.txt и собирает ссылки со всех
-имеющихся страниц в файл out/europa_articles.txt с учетом цены или без. Остатки приблизительны.
+имеющихся страниц в файл out/europa_articles.txt с учетом цены или без. Остатки приблизительны. Количество товаров
+может зависеть от адреса магазина до 2 раз.
 Особенность: исключить брэнд Собственное производство"""
 
 import time
@@ -32,7 +33,7 @@ def read_catalogs_from_txt():
 
 def add_to_txt_file_url_product(urls):
     with open('out/url_list_product.txt', 'a') as output:
-        print('Добавляю в файл out/url_list_product.txt')
+        # print('Добавляю в файл out/url_list_product.txt')
         for row in urls:
             output.write(str(f'{row}') + '\n')
 
@@ -46,6 +47,7 @@ class Europa:
     def __init__(self, playwright):
         self.catalogs = read_catalogs_from_txt()
         self.set_playwright_config(playwright=playwright)
+        self.click = 1
 
     def set_playwright_config(self, playwright):
         js = """
@@ -77,10 +79,17 @@ class Europa:
 
     def view60(self):
         """Делаем вывод товаров по 60 шт на странице"""
-        self.page.get_by_role("button", name="Выводить по").click()
-        time.sleep(10)
-        self.page.get_by_role("button", name="Выводить по 60").click()
+        self.page.goto('https://europa-market.ru/catalog/sobstvennaya-torgovaya-marka-3')
+        self.page.wait_for_load_state('load')
         time.sleep(5)
+        print(
+            f'{bcolors.OKGREEN}Установите вывод товаров по 60 шт вручную, затем в инспекторе нажмите продолжить{bcolors.ENDC}')
+        self.page.pause()
+        # self.page.get_by_role("button", name="Выводить по 24").click()
+        # time.sleep(10)
+        # self.page.get_by_role("button", name="Выводить по 60").click()
+        # print('Сейчас должен быть вывод по 60, если нет, можно включить вручную, есть 10 сек')
+        # time.sleep(10)
 
     def check_ddos(self, title):
         """Проверяем, сработала ли DDOS защита, т.е. смотрим текст, что в заголовке"""
@@ -108,9 +117,23 @@ class Europa:
         len_links = self.get_urls_from_page()
         if len_links < 60:
             return
+            # decision = input(f'На странице менее 60 ссылок, а именно - {len_links}. '
+            #                  f'\nСтраницы товаров в этой категории закончились или еще есть? '
+            #                  f'\nВведите число: \n1 - страницы в этой категории закончились, переходим к следующей'
+            #                  f'\n2 - страницы не закончились, продолжаем листать страницы в этой категории')
+            # if decision == 1:
+            #     return
+            # elif decision == 2:
+            #     self.page.locator(".ui-pagination__pagination > div:nth-child(3) > .icon").click()
+            #     self.click += 1
+            #     print(f'Прогружается страница после продолжения: {self.click}')
+            #     time.sleep(5)
+            #     self.paginator()
         else:
             self.page.locator(".ui-pagination__pagination > div:nth-child(3) > .icon").click()
-            time.sleep(10)
+            self.click += 1
+            print(f'Прогружается страница: {self.click}')
+            time.sleep(5)
             self.paginator()
 
     def get_arts_from_catalogs(self):
@@ -127,7 +150,6 @@ class Europa:
 
     def start(self):
         self.set_city()
-        self.page.goto('https://europa-market.ru/catalog/sobstvennaya-torgovaya-marka-3')
         self.view60()
         self.get_arts_from_catalogs()
 

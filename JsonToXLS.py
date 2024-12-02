@@ -6,11 +6,11 @@ import pandas as pd
 
 from openpyxl.utils import get_column_letter
 
-FILE_NAME_JSON = 'result_merge_data.json'  # out/FILE_NAME_JSON
+FILE_NAME_JSON = 'out/data.json'  # out/FILE_NAME_JSON
 
 
 def read_json():
-    with open(f'out/{FILE_NAME_JSON}', 'r', encoding='utf-8') as json_file:
+    with open(f'{FILE_NAME_JSON}', 'r', encoding='utf-8') as json_file:
         data = json.load(json_file)
         return data
 
@@ -43,7 +43,7 @@ def create_df_by_dict(data_dict):
         # Обработка характеристик
         characteristics = value.get("characteristics", {})
         brand = characteristics.get("Бренд", characteristics.get("Торговая марка", "NoName"))
-        country = characteristics.get("Страна изготовитель", "Китай")
+        country = characteristics.get("Страна изготовитель", "-")
         ovk = characteristics.get("Объем/вес/количество", '-')
         # Обработка ВхШхГ
         dimensions = characteristics.get("ВхШхГ", "0.0х0.0х0.0")
@@ -104,7 +104,7 @@ def create_df_by_dict(data_dict):
 
 
 def create_xls(df):
-    file_name = f'out\\Europe.xlsx'
+    file_name = f'out\\Европа Новогодний парс декабрь 2024.xlsx'
     # Сохранение DataFrame в Excel с использованием Styler
     with pd.ExcelWriter(file_name, engine='openpyxl') as writer:
         df.to_excel(writer, sheet_name='OZON', index=False, na_rep='NaN')

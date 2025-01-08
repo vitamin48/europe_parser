@@ -1,5 +1,5 @@
 """Скрипт на основе playwright считывает каталоги europa-market.ru из файла catalogs.txt и собирает ссылки со всех
-имеющихся страниц в файл out/europa_articles.txt с учетом цены или без. Остатки приблизительны. Количество товаров
+имеющихся страниц в файл out/url_list_product.txt с учетом цены или без. Остатки приблизительны. Количество товаров
 может зависеть от адреса магазина до 2 раз.
 Особенность: исключить брэнд Собственное производство"""
 
@@ -105,10 +105,12 @@ class Europa:
         links = [link.get_attribute('href') for link in products]
         # Сохранение имен в списке
         names = [name.text_content() for name in products]
+        codes = [link.split('-')[-1] for link in links]
         if len(links) != len(names):
             input('ОШИБКА! Количество имен и ссылок на странице не совпадают')
-        # Объединение имен и ссылок с табуляцией
-        combined_data = [f"{name.strip()}\thttps://europa-market.ru{link}" for name, link in zip(names, links)]
+        # Объединение имен, ссылок и кодов с табуляцией
+        combined_data = [f"e_{code}\t{name.strip()}\thttps://europa-market.ru{link}" for code, name, link in
+                         zip(codes, names, links)]
         add_to_txt_file_url_product(combined_data)
         return len(links)
 

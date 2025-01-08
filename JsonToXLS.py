@@ -6,7 +6,7 @@ import pandas as pd
 
 from openpyxl.utils import get_column_letter
 
-FILE_NAME_JSON = 'out/data.json'  # out/FILE_NAME_JSON
+FILE_NAME_JSON = 'out/eur6may24.json'  # out/FILE_NAME_JSON
 
 
 def read_json():
@@ -86,6 +86,15 @@ def create_df_by_dict(data_dict):
     excluded_brands = read_bad_brand()
     df["Бренд_нижний_регистр"] = df["Бренд"].str.lower().str.strip()
     df_filtered = df[~df["Бренд_нижний_регистр"].isin(excluded_brands)].copy()
+    # Формируем таблицу товаров только с нежелательными брендами для учета
+    df_excluded = df[df["Бренд_нижний_регистр"].isin(excluded_brands)].copy()
+    df_excluded["Артикул"] = df_excluded["ArtNumber"].apply(lambda art: f'e_{art}')
+    df_excluded.drop(columns=["Бренд_нижний_регистр", "Цена Европы", "Остатки", "Описание",
+                              "Ссылка на главное фото товара", "Ссылки на другие фото товара", "Страна", "Ширина, мм",
+                              "Высота, мм", "Длина, мм", "Характеристики", "ОВК", "ArtNumber"], inplace=True)
+    desired_order_df_excluded = ['Артикул', 'Название', 'Бренд', 'art_url']
+    df_excluded = df_excluded[desired_order_df_excluded]
+
     df_filtered.drop(columns=["Бренд_нижний_регистр"], inplace=True)
     df_filtered["Артикул"] = df_filtered["ArtNumber"].apply(lambda art: f'e_{art}')
     # Добавляем столбец Цена для OZON
@@ -100,11 +109,10 @@ def create_df_by_dict(data_dict):
                      'Ссылки на другие фото товара', 'Бренд', 'ArtNumber', 'Описание', 'Страна',
                      'Характеристики', 'art_url']
     result_df = df_filtered[desired_order]
-    return result_df
+    return result_df, df_excluded
 
 
-def create_xls(df):
-    file_name = f'out\\Европа Новогодний парс декабрь 2024.xlsx'
+def create_xls(df, file_name, adjusting_column_widths=True):
     # Сохранение DataFrame в Excel с использованием Styler
     with pd.ExcelWriter(file_name, engine='openpyxl') as writer:
         df.to_excel(writer, sheet_name='OZON', index=False, na_rep='NaN')
@@ -116,19 +124,22 @@ def create_xls(df):
             worksheet_ozon.column_dimensions[col_letter].width = column_width
         # Закрепите первую строку
         worksheet_ozon.freeze_panes = 'A2'
-        # Корректировка ширины столбцов
-        worksheet_ozon.column_dimensions[get_column_letter(df.columns.get_loc('Название') + 1)].width = 30
-        worksheet_ozon.column_dimensions[get_column_letter(df.columns.get_loc('Описание') + 1)].width = 30
-        worksheet_ozon.column_dimensions[get_column_letter(df.columns.get_loc('Характеристики') + 1)].width = 30
-        worksheet_ozon.column_dimensions[
-            get_column_letter(df.columns.get_loc('Ссылка на главное фото товара') + 1)].width = 30
-        worksheet_ozon.column_dimensions[
-            get_column_letter(df.columns.get_loc('Ссылки на другие фото товара') + 1)].width = 30
-        worksheet_ozon.column_dimensions[
-            get_column_letter(df.columns.get_loc('art_url') + 1)].width = 20
+        if adjusting_column_widths:
+            # Корректировка ширины столбцов
+            worksheet_ozon.column_dimensions[get_column_letter(df.columns.get_loc('Название') + 1)].width = 30
+            worksheet_ozon.column_dimensions[get_column_letter(df.columns.get_loc('Описание') + 1)].width = 30
+            worksheet_ozon.column_dimensions[get_column_letter(df.columns.get_loc('Характеристики') + 1)].width = 30
+            worksheet_ozon.column_dimensions[
+                get_column_letter(df.columns.get_loc('Ссылка на главное фото товара') + 1)].width = 30
+            worksheet_ozon.column_dimensions[
+                get_column_letter(df.columns.get_loc('Ссылки на другие фото товара') + 1)].width = 30
+            worksheet_ozon.column_dimensions[
+                get_column_letter(df.columns.get_loc('art_url') + 1)].width = 20
 
 
 if __name__ == '__main__':
     data_json = read_json()
-    df = create_df_by_dict(data_dict=data_json)
-    create_xls(df)
+    df_res, df_excluded = create_df_by_dict(data_dict=data_json)
+    create_xls(df_res, file_name='out\\Европа парс 6 мая 2024.xlsx')
+    create_xls(df_excluded, file_name='out\\Европа НЕЖЕЛАТЕЛЬНЫЙ БРЕНД парс 6 мая 2024.xlsx',
+               adjusting_column_widths=False)

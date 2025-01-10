@@ -202,6 +202,7 @@ class EuropaParser:
                         if retry_count == 0:
                             print('DDOS. Ждем 60 с')
                             time.sleep(60)
+                            send_logs_to_telegram(message=f'Обнаружена защита от DDOS! Ждем 60 с.')
                         elif retry_count == 1:
                             print('DDOS. Ждем 500 с')
                             time.sleep(500)

@@ -1,12 +1,16 @@
 """
-Скрипт считывает файл JSON с товарами Фермера и записывает данные в Excel.
+Скрипт считывает файл JSON (необходимо задать FILE_NAME_JSON) с товарами и записывает данные в Excel.
+Формируется 3 листа:
+1. С товарами и логикой обработки
+2. Остатки
+3. С товарами, которые содержат НЕЖЕЛАТЕЛЬНЫЕ БРЕНДЫ
 """
 import json
 import pandas as pd
 
 from openpyxl.utils import get_column_letter
 
-FILE_NAME_JSON = 'out/eur6may24.json'  # out/FILE_NAME_JSON
+FILE_NAME_JSON = 'out/result_merge_data.json'  # out/FILE_NAME_JSON
 
 
 def read_json():
@@ -43,7 +47,9 @@ def create_df_by_dict(data_dict):
         # Обработка характеристик
         characteristics = value.get("characteristics", {})
         brand = characteristics.get("Бренд", characteristics.get("Торговая марка", "NoName"))
-        country = characteristics.get("Страна изготовитель", "-")
+        if brand == '-':
+            brand = 'noname'
+        country = characteristics.get("Страна изготовитель", "Китай")  # компромиссное решение с Китаем
         ovk = characteristics.get("Объем/вес/количество", '-')
         # Обработка ВхШхГ
         dimensions = characteristics.get("ВхШхГ", "0.0х0.0х0.0")
@@ -103,43 +109,61 @@ def create_df_by_dict(data_dict):
     df_filtered['Цена до скидки'] = df_filtered['Цена для OZON'].apply(lambda x: int(round(x * 1.3)))
     # Добавляем столбец НДС Не облагается
     df_filtered["НДС"] = "Не облагается"
+    # Добавляем ВЕС пустой столбец
+    df_filtered['Вес'] = None
+    df_stocks = df_filtered[['Артикул', 'Остатки']]
     # Задаем порядок столбцов
-    desired_order = ['Артикул', 'Название', 'Цена для OZON', 'Цена до скидки', 'НДС', 'Остатки', 'Цена Европы',
-                     'ОВК', 'Ширина, мм', 'Высота, мм', 'Длина, мм', 'Ссылка на главное фото товара',
+    desired_order = ['Артикул', 'Название', 'Цена для OZON', 'Цена до скидки', 'НДС', 'Цена Европы',
+                     'ОВК', 'Вес', 'Ширина, мм', 'Высота, мм', 'Длина, мм', 'Ссылка на главное фото товара',
                      'Ссылки на другие фото товара', 'Бренд', 'ArtNumber', 'Описание', 'Страна',
                      'Характеристики', 'art_url']
     result_df = df_filtered[desired_order]
-    return result_df, df_excluded
+    return result_df, df_excluded, df_stocks
 
 
-def create_xls(df, file_name, adjusting_column_widths=True):
+def create_xls(df_res, df_excluded, df_stocks, file_name):
     # Сохранение DataFrame в Excel с использованием Styler
     with pd.ExcelWriter(file_name, engine='openpyxl') as writer:
-        df.to_excel(writer, sheet_name='OZON', index=False, na_rep='NaN')
+        df_res.to_excel(writer, sheet_name='OZON', index=False, na_rep='NaN')
         # Установка ширины столбцов
         worksheet_ozon = writer.sheets['OZON']
-        for column in df:
-            column_width = max(df[column].astype(str).map(len).max(), len(column)) + 2
-            col_letter = get_column_letter(df.columns.get_loc(column) + 1)
+        for column in df_res:
+            column_width = max(df_res[column].astype(str).map(len).max(), len(column)) + 2
+            col_letter = get_column_letter(df_res.columns.get_loc(column) + 1)
             worksheet_ozon.column_dimensions[col_letter].width = column_width
         # Закрепите первую строку
         worksheet_ozon.freeze_panes = 'A2'
-        if adjusting_column_widths:
-            # Корректировка ширины столбцов
-            worksheet_ozon.column_dimensions[get_column_letter(df.columns.get_loc('Название') + 1)].width = 30
-            worksheet_ozon.column_dimensions[get_column_letter(df.columns.get_loc('Описание') + 1)].width = 30
-            worksheet_ozon.column_dimensions[get_column_letter(df.columns.get_loc('Характеристики') + 1)].width = 30
-            worksheet_ozon.column_dimensions[
-                get_column_letter(df.columns.get_loc('Ссылка на главное фото товара') + 1)].width = 30
-            worksheet_ozon.column_dimensions[
-                get_column_letter(df.columns.get_loc('Ссылки на другие фото товара') + 1)].width = 30
-            worksheet_ozon.column_dimensions[
-                get_column_letter(df.columns.get_loc('art_url') + 1)].width = 20
+        # Корректировка ширины столбцов
+        worksheet_ozon.column_dimensions[get_column_letter(df_res.columns.get_loc('Название') + 1)].width = 30
+        worksheet_ozon.column_dimensions[get_column_letter(df_res.columns.get_loc('Описание') + 1)].width = 30
+        worksheet_ozon.column_dimensions[get_column_letter(df_res.columns.get_loc('Характеристики') + 1)].width = 30
+        worksheet_ozon.column_dimensions[
+            get_column_letter(df_res.columns.get_loc('Ссылка на главное фото товара') + 1)].width = 30
+        worksheet_ozon.column_dimensions[
+            get_column_letter(df_res.columns.get_loc('Ссылки на другие фото товара') + 1)].width = 30
+        worksheet_ozon.column_dimensions[
+            get_column_letter(df_res.columns.get_loc('art_url') + 1)].width = 20
+
+        # Лист "Stocks"
+        df_stocks.to_excel(writer, sheet_name='Остатки', index=False, na_rep='NaN')
+        worksheet_stocks = writer.sheets['Остатки']
+        for column in df_stocks:
+            column_width = max(df_stocks[column].astype(str).map(len).max(), len(column)) + 2
+            col_letter = get_column_letter(df_stocks.columns.get_loc(column) + 1)
+            worksheet_stocks.column_dimensions[col_letter].width = column_width
+        worksheet_stocks.freeze_panes = 'A2'
+
+        # Лист "Excluded"
+        df_excluded.to_excel(writer, sheet_name='Нежелательный бренд', index=False, na_rep='NaN')
+        worksheet_excluded = writer.sheets['Нежелательный бренд']
+        for column in df_excluded:
+            column_width = max(df_excluded[column].astype(str).map(len).max(), len(column)) + 2
+            col_letter = get_column_letter(df_excluded.columns.get_loc(column) + 1)
+            worksheet_excluded.column_dimensions[col_letter].width = column_width
+        worksheet_excluded.freeze_panes = 'A2'
 
 
 if __name__ == '__main__':
     data_json = read_json()
-    df_res, df_excluded = create_df_by_dict(data_dict=data_json)
-    create_xls(df_res, file_name='out\\Европа парс 6 мая 2024.xlsx')
-    create_xls(df_excluded, file_name='out\\Европа НЕЖЕЛАТЕЛЬНЫЙ БРЕНД парс 6 мая 2024.xlsx',
-               adjusting_column_widths=False)
+    df_res, df_excluded, df_stocks = create_df_by_dict(data_dict=data_json)
+    create_xls(df_res, df_excluded, df_stocks, file_name='out\\Европа парс 10.01.2025.xlsx')

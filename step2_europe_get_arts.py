@@ -11,6 +11,8 @@
 4. Собираем в одном месте все ссылки на товары, которые не стали грузить (например, хлеб)
 5. Вы читаем из п.2 ссылки из пунктов 1, 3 и 4.
 
+ДОРАБОТКА:
+- Если в каталоге 60 товаров, то будет ошибка, т.к. не перейдет на 2 страницу (наверное)
 """
 
 import time
@@ -19,19 +21,9 @@ from playwright.sync_api import Playwright, sync_playwright, expect
 import traceback
 from tqdm import tqdm
 
+from config import send_logs_to_telegram, bcolors
+
 ADDRESS_SHOP = 'Брянск-58, ул. Горбатова, 18'
-
-
-class bcolors:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKCYAN = '\033[96m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
 
 
 def read_catalogs_from_txt():
@@ -165,9 +157,10 @@ def main():
     except Exception as exp:
         print(exp)
         print(traceback.format_exc())
-        # send_logs_to_telegram(message=f'Произошла ошибка!\n\n\n{exp}')
+        send_logs_to_telegram(message=f'Произошла ошибка!\n\n\n{exp}')
     t2 = datetime.datetime.now()
     print(f'Finish: {t2}, TIME: {t2 - t1}')
+    send_logs_to_telegram(message=f'Finish: {t2}, TIME: {t2 - t1}')
 
 
 if __name__ == '__main__':

@@ -9,7 +9,6 @@ articles_with_bad_req.txt - для ссылок, которые не удало�
 брэндов, либо другая ошибка с указанием этой ошибки
 """
 
-import requests
 import datetime
 import time
 import re
@@ -19,7 +18,7 @@ import json
 import traceback
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
-from europe_arts import bcolors
+from config import send_logs_to_telegram, bcolors
 
 ADDRESS_SHOP = 'Брянск-58, ул. Горбатова, 18'
 
@@ -42,24 +41,6 @@ def add_bad_req(art, error=''):
 def write_json(res_dict):
     with open('out/data.json', 'w', encoding='utf-8') as json_file:
         json.dump(res_dict, json_file, indent=2, ensure_ascii=False)
-
-
-def send_logs_to_telegram(message):
-    import platform
-    import socket
-    import os
-
-    platform = platform.system()
-    hostname = socket.gethostname()
-    user = os.getlogin()
-
-    bot_token = '6456958617:AAF8thQveHkyLLtWtD02Rq1UqYuhfT4LoTc'
-    chat_id = '128592002'
-
-    url = f'https://api.telegram.org/bot{bot_token}/sendMessage'
-    data = {"chat_id": chat_id, "text": message + f'\n\n{platform}\n{hostname}\n{user}'}
-    response = requests.post(url, data=data)
-    return response.json()
 
 
 class EuropaParser:

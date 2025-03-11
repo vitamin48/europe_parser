@@ -1,5 +1,6 @@
 """
-Скрипт считывает файл JSON (необходимо задать FILE_NAME_JSON) с товарами и записывает данные в Excel.
+Скрипт считывает файл JSON (необходимо задать FILE_NAME_JSON и имя результирующего файла) с товарами и записывает
+данные в Excel.
 Формируется 3 листа:
 1. С товарами и логикой обработки
 2. Остатки
@@ -10,7 +11,7 @@ import pandas as pd
 
 from openpyxl.utils import get_column_letter
 
-FILE_NAME_JSON = 'out/result_merge_data.json'  # out/FILE_NAME_JSON
+FILE_NAME_JSON = 'out/data.json'  # out/FILE_NAME_JSON
 
 
 def read_json():
@@ -166,4 +167,4 @@ def create_xls(df_res, df_excluded, df_stocks, file_name):
 if __name__ == '__main__':
     data_json = read_json()
     df_res, df_excluded, df_stocks = create_df_by_dict(data_dict=data_json)
-    create_xls(df_res, df_excluded, df_stocks, file_name='out\\Европа парс 10.01.2025.xlsx')
+    create_xls(df_res, df_excluded, df_stocks, file_name='out\\Европа парс 10.03.2025.xlsx')

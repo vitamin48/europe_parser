@@ -2,7 +2,7 @@
 Скрипт на основе playwright считывает ссылки на товары Европа из файла product_list_for_get_data.txt,
 переходит по ним, предварительно установив город и адрес магазина из константы ADDRESS_SHOP,
 считывает информацию и остатки каждого товара, если брэнда товара нет в файле bad_brand.txt,
-записывает результаты в файл JSON.
+записывает результаты в файл JSON. Перед запуском важно обновить список нежелательных брендов.
 
 Помимо результирующего файла JSON, формируются дополнительные файлы:
 articles_with_bad_req.txt - для ссылок, которые не удалось загрузить, либо товар из списка нежелательных
@@ -60,7 +60,9 @@ class EuropaParser:
         Object.defineProperties(navigator, {webdriver:{get:()=>undefined}});
         """
         self.playwright = playwright
-        self.browser = playwright.chromium.launch(headless=False, args=['--blink-settings=imagesEnabled=false'])
+        self.browser = playwright.chromium.launch(headless=False,
+                                                  args=['--blink-settings='
+                                                        'imagesEnabled=false'])
         self.context = self.browser.new_context()
         self.page = self.context.new_page()
         self.page.add_init_script(js)
@@ -232,7 +234,7 @@ def main():
         send_logs_to_telegram(message=f'Произошла ошибка!\n\n\n{exp}\n\n{traceback_str}')
     t2 = datetime.datetime.now()
     print(f'Finish: {t2}, TIME: {t2 - t1}')
-    # send_logs_to_telegram(message=f'Finish: {t2}, TIME: {t2 - t1}')
+    send_logs_to_telegram(message=f'Finish: {t2}, TIME: {t2 - t1}')
 
 
 if __name__ == '__main__':

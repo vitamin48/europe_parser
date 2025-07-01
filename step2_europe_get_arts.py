@@ -119,7 +119,7 @@ class Europa:
     def paginator(self):
         """Пролистываем страницы, пока на странице не будет менее 60 товаров."""
         len_links = self.get_urls_from_page()
-        if len_links < 60:
+        if len_links <= 60:
             return
         else:
             self.page.locator(".ui-pagination__pagination > div:nth-child(3) > .icon").click()

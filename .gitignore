@@ -190,3 +190,5 @@ db_bot.db
 /.idea/codeStyles/codeStyleConfig.xml
 /out/data.json
 /out/Европа парс 10.03.2025.xlsx
+in/catalogs.txt
+in/product_list_for_get_data.txt

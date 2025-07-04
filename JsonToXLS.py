@@ -12,7 +12,7 @@ import pandas as pd
 from openpyxl.utils import get_column_letter
 
 FILE_NAME_JSON = 'out/data.json'  # out/FILE_NAME_JSON
-RESULT_FILE_NAME = 'out/Европа парс 01.07.2025.xlsx'
+RESULT_FILE_NAME = 'out/Новая цена Европа парс 01.07.2025.xlsx'
 
 
 def read_json():
@@ -29,15 +29,29 @@ def read_bad_brand():
 
 
 def transform_price(x):
-    result = x * 5 if x < 200 else (
-        x * 4.5 if 200 <= x < 500 else (
-            x * 4 if 500 <= x < 1000 else (
-                x * 3.5 if 1000 <= x < 5000 else (
-                    x * 3 if 5000 <= x < 10000 else (
-                        x * 2.5 if 10000 <= x < 20000 else (x * 2))))))
-    # Убеждаемся, что значение после преобразований не меньше 490
-    result = max(result, 490)
-    # Округление до целого числа
+    match x:
+        case _ if x < 100:
+            result = x * 7
+        case _ if x < 250:
+            result = x * 6
+        case _ if x < 500:
+            result = x * 5
+        case _ if x < 750:
+            result = x * 4.5
+        case _ if x < 1000:
+            result = x * 4
+        case _ if x < 1500:
+            result = x * 3.5
+        case _ if x < 2000:
+            result = x * 3
+        case _ if x < 3000:
+            result = x * 2.5
+        case _ if x < 4000:
+            result = x * 2
+        case _:
+            result = x * 1.5
+
+    result = max(result, 590)
     return round(result)
 
 

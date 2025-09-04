@@ -1,5 +1,5 @@
 """
-Скрипт на основе playwright считывает ссылки на товары Европа из файла product_list_for_get_data.txt,
+Скрипт на основе playwright считывает ссылки на товары Европа из файла product_links_for_get_data.txt,
 переходит по ним, предварительно установив город и адрес магазина из константы ADDRESS_SHOP,
 считывает информацию и остатки каждого товара, если брэнда товара нет в файле bad_brand.txt,
 записывает результаты в файл JSON. Перед запуском важно обновить список нежелательных брендов.
@@ -25,7 +25,7 @@ ADDRESS_SHOP = 'Брянск-58, ул. Горбатова, 18'
 
 def read_product_list_from_txt():
     """Считывает и возвращает список ссылок на товары из файла"""
-    with open('in/product_list_for_get_data.txt', 'r', encoding='utf-8') as file:
+    with open('in/product_links_for_get_data.txt', 'r', encoding='utf-8') as file:
         product_list = [f'{line}'.rstrip() for line in file]
     return product_list
 

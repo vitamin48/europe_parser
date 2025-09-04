@@ -1,5 +1,6 @@
 import asyncio
 from playwright.async_api import async_playwright, TimeoutError
+from tqdm import tqdm
 
 
 async def main():
@@ -25,7 +26,7 @@ async def main():
             return
 
         with open(output_file, "a", encoding="utf-8") as results_file:
-            for article in articles:
+            for article in tqdm(articles):
                 article_clean = article.strip()
                 if not article_clean:
                     continue

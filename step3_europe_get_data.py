@@ -17,7 +17,7 @@ import requests
 import platform
 import socket
 import traceback
-from playwright.sync_api import sync_playwright, Playwright, Page, TimeoutError
+from playwright.sync_api import sync_playwright, Page, TimeoutError
 from tqdm import tqdm
 from colorama import init, Fore, Style
 
@@ -122,9 +122,6 @@ def get_article_from_url(url: str) -> str | None:
     return match.group(1) if match else None
 
 
-# ##################################################################
-# ИСПРАВЛЕННАЯ ФУНКЦИЯ УСТАНОВКИ ГОРОДА (возврат к Codegen-логике)
-# ##################################################################
 def set_city(page: Page):
     try:
         print('Автоматическая установка города и магазина...')
@@ -152,12 +149,10 @@ def set_city(page: Page):
         time.sleep(2)
 
         print("6. Открываем список магазинов")
-        # Возвращаем рабочий селектор из Codegen
         page.locator("div").filter(has_text=re.compile(r"^Нажмите, чтобы выбрать адрес$")).nth(1).click()
         time.sleep(2)
 
         print(f"7. Выбираем магазин по индексу '{SHOP_INDEX_TO_CLICK}'")
-        # Возвращаем клик по индексу
         page.get_by_text(SHOP_INDEX_TO_CLICK).click()
         time.sleep(2)
 
@@ -175,8 +170,30 @@ def set_city(page: Page):
 
 
 # ##################################################################
-
+# ИЗМЕНЕННАЯ ФУНКЦИЯ ПАРСИНГА СТРАНИЦЫ
+# ##################################################################
 def parse_product_page(page: Page, product_url: str) -> dict | None:
+    # ПРОВЕРКА №1: Проверяем, не является ли эта страница сообщением "Товар не найден"
+    # Это самый надежный способ избежать ошибок на несуществующих страницах.
+    try:
+        # Ищем заголовок h1 с текстом "Товар не найден"
+        not_found_heading = page.get_by_role("heading", name="Товар не найден")
+        # Даем ему короткий таймаут. Если он есть - он появится быстро.
+        if not_found_heading.is_visible(timeout=2500):
+            print(Fore.YELLOW + f"  - Товар не найден (страница 404).")
+            # Логируем и выходим из функции, возвращая None
+            log_failed_url(product_url, "Товар не найден (404-style page)", OUTPUT_FAILED_FILE)
+            return None
+    except TimeoutError:
+        # Это нормальная ситуация для валидной страницы, просто продолжаем
+        pass
+    except Exception as e:
+        print(Fore.RED + f"  - Ошибка при проверке на 'Товар не найден': {e}")
+        # В случае другой ошибки, лучше продолжить и дать основному блоку обработать ее
+        pass
+
+    # ПРОВЕРКА №2: Основной блок парсинга с проверкой на наличие блока с ценой
+    # (для случаев, когда товар просто "не в наличии", но страница существует)
     try:
         cart_block = page.locator('.product-cart')
         cart_block.wait_for(timeout=7000)
@@ -189,9 +206,18 @@ def parse_product_page(page: Page, product_url: str) -> dict | None:
         price = float(f"{price_int}.{price_frac}")
 
     except TimeoutError:
-        raise ValueError('Товар отсутствует в наличии (не найден блок с ценой)')
+        # Если блок с ценой не найден, это тоже неудача. Логируем и возвращаем None.
+        print(Fore.YELLOW + f"  - Товар отсутствует в наличии (не найден блок с ценой).")
+        log_failed_url(product_url, "Товар отсутствует (нет блока цены)", OUTPUT_FAILED_FILE)
+        article_id = get_article_from_url(product_url) or "unknown"
+        save_debug_info(page, f"{article_id}_no_price_block")
+        return None
     except Exception as e:
+        # Если произошла другая ошибка при получении цены, считаем это полноценной ошибкой
+        # и пробрасываем ее выше, чтобы сработал механизм повторных попыток.
         raise ValueError(f"Не удалось получить цену: {e}")
+
+    # --- Если прошли проверки, начинаем сбор остальных данных ---
 
     code_loc = page.locator('.product-info__sku')
     code = (re.search(r'\d+', code_loc.text_content()).group()
@@ -202,7 +228,6 @@ def parse_product_page(page: Page, product_url: str) -> dict | None:
     name = name_loc.text_content().strip() if name_loc.count() > 0 else '-'
 
     stock = "В наличии"
-
     description = '-'
     characteristics_dict = {}
 
@@ -248,6 +273,8 @@ def parse_product_page(page: Page, product_url: str) -> dict | None:
         'characteristics': characteristics_dict, 'img_url': image_links, 'art_url': product_url
     }
 
+
+# ##################################################################
 
 def main():
     init(autoreset=True)
@@ -314,9 +341,16 @@ def main():
                         if "ddos" in title.lower():
                             raise ValueError("Обнаружена DDOS-защита")
 
+                        # Функция теперь сама обрабатывает страницы "не найдено" и возвращает None
                         product_data = parse_product_page(page, url)
+                        # Если данные получены (не None), выходим из цикла попыток
                         if product_data:
                             break
+                        # Если parse_product_page вернула None, это значит товар не найден или не в наличии.
+                        # Это не ошибка, которую нужно повторять, а констатация факта. Поэтому тоже выходим.
+                        else:
+                            break  # Выходим из цикла for attempt, т.к. повторять нет смысла
+
                     except Exception as e:
                         error_text = str(e)
                         print(Fore.RED + f"\n  [Попытка {attempt + 1}] ОШИБКА: {error_text[:200]}")
@@ -334,10 +368,12 @@ def main():
                         if attempt < MAX_RETRIES - 1:
                             time.sleep(10)
 
+                # Сохраняем данные только если они были успешно собраны
                 if product_data:
                     all_data[article_id] = product_data
                     save_json_data(all_data, OUTPUT_JSON_FILE)
-                else:
+                # Если product_data это None после всех попыток (или после одной, если товар не найден)
+                elif attempt == MAX_RETRIES - 1:  # Логируем окончательную неудачу только если это была реальная ошибка
                     print(Fore.RED + Style.BRIGHT + f"!!! НЕ УДАЛОСЬ обработать {url} после {MAX_RETRIES} попыток.")
                     log_failed_url(url, "Не удалось спарсить после всех попыток", OUTPUT_FAILED_FILE)
 

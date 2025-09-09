@@ -9,7 +9,7 @@ from openpyxl.utils import get_column_letter
 
 # Имена файлов для удобства вынесены в константы
 FILE_NAME_JSON = 'out/data.json'
-RESULT_FILE_NAME = 'out/6.xlsx'
+RESULT_FILE_NAME = 'out/ПарсЕвро250909.xlsx'
 
 
 def read_json():

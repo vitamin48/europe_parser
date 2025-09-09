@@ -34,8 +34,6 @@ except ImportError:
     BOT_TOKEN, CHAT_ID = None, None
 
 # Настройки парсера
-# ВАЖНО: Код ниже жестко привязан к выбору магазина по индексу "241001",
-# который соответствует этому адресу.
 ADDRESS_SHOP = 'Брянск-58, ул. Горбатова, 18'
 SHOP_INDEX_TO_CLICK = "241001"
 
@@ -127,36 +125,36 @@ def set_city(page: Page):
         print('Автоматическая установка города и магазина...')
         page.goto("https://europa-market.ru/", timeout=60000)
 
-        print("1. Ждем окно выбора города и нажимаем 'Нет, выбрать другой'")
+        # print("1. Ждем окно выбора города и нажимаем 'Нет, выбрать другой'")
         page.get_by_role("button", name="Нет, выбрать другой").click(timeout=15000)
         time.sleep(2)
 
-        print("2. Выбираем 'Брянск'")
+        # print("2. Выбираем 'Брянск'")
         page.get_by_text("Брянск").click()
         time.sleep(2)
 
         if page.get_by_role("button", name="Выбрать").is_visible(timeout=3000):
-            print("3. Нажимаем 'Выбрать'")
+            # print("3. Нажимаем 'Выбрать'")
             page.get_by_role("button", name="Выбрать").click()
             time.sleep(3)
 
-        print("4. Открываем меню выбора адреса/самовывоза")
+        # print("4. Открываем меню выбора адреса/самовывоза")
         page.locator(".user-address--default").click()
         time.sleep(2)
 
-        print("5. Переключаемся на вкладку 'Самовывоз'")
+        # print("5. Переключаемся на вкладку 'Самовывоз'")
         page.get_by_role("button", name="Самовывоз").click()
         time.sleep(2)
 
-        print("6. Открываем список магазинов")
+        # print("6. Открываем список магазинов")
         page.locator("div").filter(has_text=re.compile(r"^Нажмите, чтобы выбрать адрес$")).nth(1).click()
         time.sleep(2)
 
-        print(f"7. Выбираем магазин по индексу '{SHOP_INDEX_TO_CLICK}'")
+        # print(f"7. Выбираем магазин по индексу '{SHOP_INDEX_TO_CLICK}'")
         page.get_by_text(SHOP_INDEX_TO_CLICK).click()
         time.sleep(2)
 
-        print("8. Нажимаем 'Применить'")
+        # print("8. Нажимаем 'Применить'")
         page.get_by_role("button", name="Применить").click()
 
         print(Fore.GREEN + f'Успешно установлен адрес: {ADDRESS_SHOP}')
@@ -169,31 +167,19 @@ def set_city(page: Page):
         return False
 
 
-# ##################################################################
-# ИЗМЕНЕННАЯ ФУНКЦИЯ ПАРСИНГА СТРАНИЦЫ
-# ##################################################################
 def parse_product_page(page: Page, product_url: str) -> dict | None:
-    # ПРОВЕРКА №1: Проверяем, не является ли эта страница сообщением "Товар не найден"
-    # Это самый надежный способ избежать ошибок на несуществующих страницах.
     try:
-        # Ищем заголовок h1 с текстом "Товар не найден"
         not_found_heading = page.get_by_role("heading", name="Товар не найден")
-        # Даем ему короткий таймаут. Если он есть - он появится быстро.
         if not_found_heading.is_visible(timeout=2500):
             print(Fore.YELLOW + f"  - Товар не найден (страница 404).")
-            # Логируем и выходим из функции, возвращая None
             log_failed_url(product_url, "Товар не найден (404-style page)", OUTPUT_FAILED_FILE)
             return None
     except TimeoutError:
-        # Это нормальная ситуация для валидной страницы, просто продолжаем
         pass
     except Exception as e:
         print(Fore.RED + f"  - Ошибка при проверке на 'Товар не найден': {e}")
-        # В случае другой ошибки, лучше продолжить и дать основному блоку обработать ее
         pass
 
-    # ПРОВЕРКА №2: Основной блок парсинга с проверкой на наличие блока с ценой
-    # (для случаев, когда товар просто "не в наличии", но страница существует)
     try:
         cart_block = page.locator('.product-cart')
         cart_block.wait_for(timeout=7000)
@@ -206,18 +192,13 @@ def parse_product_page(page: Page, product_url: str) -> dict | None:
         price = float(f"{price_int}.{price_frac}")
 
     except TimeoutError:
-        # Если блок с ценой не найден, это тоже неудача. Логируем и возвращаем None.
         print(Fore.YELLOW + f"  - Товар отсутствует в наличии (не найден блок с ценой).")
         log_failed_url(product_url, "Товар отсутствует (нет блока цены)", OUTPUT_FAILED_FILE)
         article_id = get_article_from_url(product_url) or "unknown"
         save_debug_info(page, f"{article_id}_no_price_block")
         return None
     except Exception as e:
-        # Если произошла другая ошибка при получении цены, считаем это полноценной ошибкой
-        # и пробрасываем ее выше, чтобы сработал механизм повторных попыток.
         raise ValueError(f"Не удалось получить цену: {e}")
-
-    # --- Если прошли проверки, начинаем сбор остальных данных ---
 
     code_loc = page.locator('.product-info__sku')
     code = (re.search(r'\d+', code_loc.text_content()).group()
@@ -274,14 +255,12 @@ def parse_product_page(page: Page, product_url: str) -> dict | None:
     }
 
 
-# ##################################################################
-
 def main():
     init(autoreset=True)
     start_time = datetime.datetime.now()
     start_message = f"🚀 Парсер Europa-Market запущен в {start_time.strftime('%H:%M:%S')}"
     print(Fore.CYAN + start_message)
-    send_logs_to_telegram(start_message)
+    # send_logs_to_telegram(start_message)
 
     try:
         urls_to_parse = read_urls_from_file(INPUT_URL_FILE)
@@ -322,62 +301,63 @@ def main():
 
             launch_browser()
 
-            for i, url in enumerate(tqdm(urls_to_process, desc="Сбор данных")):
-                if i > 0 and i % RESTART_BROWSER_EVERY_N_URLS == 0:
-                    print(Fore.CYAN + f"\nОбработано {i} ссылок. Плановый перезапуск браузера...")
-                    launch_browser()
+            url_counter = 0
+            with tqdm(total=len(urls_to_process), desc="Подготовка...", unit="url", ncols=120) as pbar:
+                for url in urls_to_process:
+                    # --- ИЗМЕНЕНИЕ ЗДЕСЬ ---
+                    # Сначала получаем артикул из ссылки
+                    article_id = get_article_from_url(url)
+                    # Затем устанавливаем описание для tqdm, используя этот артикул
+                    pbar.set_description(f"Сбор данных (Арт: {article_id or 'N/A'})")
 
-                product_data = None
-                article_id = get_article_from_url(url)
-                if not article_id:
-                    log_failed_url(url, "Некорректный URL", OUTPUT_FAILED_FILE)
-                    continue
+                    url_counter += 1
+                    if url_counter > 1 and (url_counter - 1) % RESTART_BROWSER_EVERY_N_URLS == 0:
+                        print(Fore.CYAN + f"\nОбработано {url_counter - 1} ссылок. Плановый перезапуск браузера...")
+                        launch_browser()
 
-                for attempt in range(MAX_RETRIES):
-                    try:
-                        page.goto(url, wait_until="domcontentloaded")
+                    product_data = None
+                    if not article_id:
+                        log_failed_url(url, "Некорректный URL", OUTPUT_FAILED_FILE)
+                        pbar.update(1)
+                        continue
 
-                        title = page.title()
-                        if "ddos" in title.lower():
-                            raise ValueError("Обнаружена DDOS-защита")
+                    for attempt in range(MAX_RETRIES):
+                        try:
+                            page.goto(url, wait_until="domcontentloaded")
+                            title = page.title()
+                            if "ddos" in title.lower():
+                                raise ValueError("Обнаружена DDOS-защита")
 
-                        # Функция теперь сама обрабатывает страницы "не найдено" и возвращает None
-                        product_data = parse_product_page(page, url)
-                        # Если данные получены (не None), выходим из цикла попыток
-                        if product_data:
-                            break
-                        # Если parse_product_page вернула None, это значит товар не найден или не в наличии.
-                        # Это не ошибка, которую нужно повторять, а констатация факта. Поэтому тоже выходим.
-                        else:
-                            break  # Выходим из цикла for attempt, т.к. повторять нет смысла
+                            product_data = parse_product_page(page, url)
+                            if product_data is not None:
+                                break
+                            else:
+                                break
 
-                    except Exception as e:
-                        error_text = str(e)
-                        print(Fore.RED + f"\n  [Попытка {attempt + 1}] ОШИБКА: {error_text[:200]}")
+                        except Exception as e:
+                            error_text = str(e)
+                            print(Fore.RED + f"\n  [Попытка {attempt + 1}] ОШИБКА: {error_text[:200]}")
+                            if "crashed" in error_text.lower():
+                                print(Fore.RED + Style.BRIGHT + "!!! ОБНАРУЖЕНО ПАДЕНИЕ СТРАНИЦЫ !!!")
+                                send_logs_to_telegram(
+                                    f"🟡 ВНИМАНИЕ: Страница упала (crashed). Перезапускаю браузер через {CRASH_RECOVERY_WAIT_SECONDS} сек.")
+                                time.sleep(CRASH_RECOVERY_WAIT_SECONDS)
+                                launch_browser()
+                                continue
+                            debug_id = f"{article_id}_attempt_{attempt + 1}"
+                            save_debug_info(page, debug_id)
+                            if attempt < MAX_RETRIES - 1:
+                                time.sleep(10)
 
-                        if "crashed" in error_text.lower():
-                            print(Fore.RED + Style.BRIGHT + "!!! ОБНАРУЖЕНО ПАДЕНИЕ СТРАНИЦЫ !!!")
-                            send_logs_to_telegram(
-                                f"🟡 ВНИМАНИЕ: Страница упала (crashed). Перезапускаю браузер через {CRASH_RECOVERY_WAIT_SECONDS} сек.")
-                            time.sleep(CRASH_RECOVERY_WAIT_SECONDS)
-                            launch_browser()
-                            continue
+                    if product_data:
+                        all_data[article_id] = product_data
+                        save_json_data(all_data, OUTPUT_JSON_FILE)
+                    elif attempt == MAX_RETRIES - 1:
+                        print(Fore.RED + Style.BRIGHT + f"!!! НЕ УДАЛОСЬ обработать {url} после {MAX_RETRIES} попыток.")
+                        log_failed_url(url, "Не удалось спарсить после всех попыток", OUTPUT_FAILED_FILE)
 
-                        debug_id = f"{article_id}_attempt_{attempt + 1}"
-                        save_debug_info(page, debug_id)
-                        if attempt < MAX_RETRIES - 1:
-                            time.sleep(10)
-
-                # Сохраняем данные только если они были успешно собраны
-                if product_data:
-                    all_data[article_id] = product_data
-                    save_json_data(all_data, OUTPUT_JSON_FILE)
-                # Если product_data это None после всех попыток (или после одной, если товар не найден)
-                elif attempt == MAX_RETRIES - 1:  # Логируем окончательную неудачу только если это была реальная ошибка
-                    print(Fore.RED + Style.BRIGHT + f"!!! НЕ УДАЛОСЬ обработать {url} после {MAX_RETRIES} попыток.")
-                    log_failed_url(url, "Не удалось спарсить после всех попыток", OUTPUT_FAILED_FILE)
-
-                time.sleep(random.uniform(*PAUSE_BETWEEN_REQUESTS))
+                    pbar.update(1)
+                    time.sleep(random.uniform(*PAUSE_BETWEEN_REQUESTS))
 
             if browser: browser.close()
 

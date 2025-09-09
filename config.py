@@ -13,7 +13,7 @@ class bcolors:
     UNDERLINE = '\033[4m'
 
 
-BOT_TOKEN = '6456958617:AAF8thQveHkyLLtWtD02Rq1UqYuhfT4LoTc'
+BOT_TOKEN = '645695861:AAEhKxpvbWxeDoq7IPf7fQo0sxbQ_LqSVz0'
 CHAT_ID = '128592002'
 
 

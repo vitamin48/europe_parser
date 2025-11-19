@@ -1,6 +1,6 @@
-"""Скрипт на основе playwright считывает каталоги europa-market.ru из файла catalogs.txt и собирает ссылки со всех
-имеющихся страниц в файл out/url_list_product.txt с учетом цены или без. Остатки приблизительны. Количество товаров
-может зависеть от адреса магазина до 2 раз.
+"""Скрипт на основе playwright считывает каталоги europa-market.ru из файла catalogs_for_get_links.txt и собирает
+ссылки со всех имеющихся страниц в файл out/url_list_product.txt с учетом цены или без.
+Остатки приблизительны. Количество товаров может зависеть от адреса магазина до 2 раз.
 Особенность: исключить брэнд Собственное производство
 
 **************************************************
@@ -28,7 +28,7 @@ ADDRESS_SHOP = 'Брянск-58, ул. Горбатова, 18'
 
 def read_catalogs_from_txt():
     """Считывает и возвращает список каталогов из файла"""
-    with open('in/catalogs.txt', 'r', encoding='utf-8') as file:
+    with open('in/catalogs_for_get_links.txt', 'r', encoding='utf-8') as file:
         catalogs = [f'{line}'.rstrip() for line in file]
     return catalogs
 
@@ -63,17 +63,23 @@ class Europa:
 
     def set_city(self):
         try:
-            print('Устанавливаем город')
             self.page.goto("https://europa-market.ru/")
-            self.page.get_by_role("button", name="Нет, выбрать другой").click()
-            self.page.get_by_role("link", name="Брянск").click()
-            time.sleep(10)
-            self.page.get_by_role("button", name="Адрес доставки").click()
-            self.page.get_by_text("Самовывоз").click()
-            self.page.get_by_placeholder("Выберите магазин из списка").click()
-            self.page.get_by_role("option", name="Брянск-58, ул. Горбатова,").click()
-            self.page.get_by_role("button", name="Готово").click()
-            print(f'Успешно установлен адрес: {ADDRESS_SHOP}')
+            self.page.wait_for_load_state('load')
+            print(
+                f'{bcolors.OKGREEN}Установите город и адрес магазина вручную, '
+                f'затем в инспекторе нажмите продолжить{bcolors.ENDC}')
+            self.page.pause()
+            # print('Устанавливаем город')
+            # self.page.goto("https://europa-market.ru/")
+            # self.page.get_by_role("button", name="Нет, выбрать другой").click()
+            # self.page.get_by_role("link", name="Брянск").click()
+            # time.sleep(10)
+            # self.page.get_by_role("button", name="Адрес доставки").click()
+            # self.page.get_by_text("Самовывоз").click()
+            # self.page.get_by_placeholder("Выберите магазин из списка").click()
+            # self.page.get_by_role("option", name="Брянск-58, ул. Горбатова,").click()
+            # self.page.get_by_role("button", name="Готово").click()
+            # print(f'Успешно установлен адрес: {ADDRESS_SHOP}')
             time.sleep(10)
         except Exception as exp:
             print(exp)
@@ -81,7 +87,7 @@ class Europa:
 
     def view60(self):
         """Делаем вывод товаров по 60 шт на странице"""
-        self.page.goto('https://europa-market.ru/catalog/sobstvennaya-torgovaya-marka-3')
+        self.page.goto('https://europa-market.ru/catalog/ot_evropy-2')
         self.page.wait_for_load_state('load')
         time.sleep(5)
         print(

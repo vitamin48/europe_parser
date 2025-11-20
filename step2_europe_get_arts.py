@@ -16,6 +16,7 @@
 """
 
 import time
+import re
 import datetime
 from playwright.sync_api import Playwright, sync_playwright, expect
 import traceback
@@ -65,12 +66,21 @@ class Europa:
         try:
             self.page.goto("https://europa-market.ru/")
             self.page.wait_for_load_state('load')
-            print(
-                f'{bcolors.OKGREEN}Установите город и адрес магазина вручную, '
-                f'затем в инспекторе нажмите продолжить{bcolors.ENDC}')
-            self.page.pause()
-            # print('Устанавливаем город')
+            # print(
+            #     f'{bcolors.OKGREEN}Установите город и адрес магазина вручную, '
+            #     f'затем в инспекторе нажмите продолжить{bcolors.ENDC}')
+            # self.page.pause()
+            print('Устанавливаем город')
             # self.page.goto("https://europa-market.ru/")
+            self.page.get_by_role("button", name="Принять").click()
+            self.page.get_by_role("button", name="Нет, выбрать другой город").click()
+            self.page.get_by_text("Брянск").click()
+            self.page.get_by_role("button", name="Выбрать").click()
+            self.page.get_by_text("Выберите доставка или самовывоз").nth(1).click()
+            self.page.get_by_role("button", name="Самовывоз").click()
+            self.page.locator("div").filter(has_text=re.compile(r"^Нажмите, чтобы выбрать адрес$")).nth(1).click()
+            self.page.get_by_text("241001").click()
+            self.page.get_by_role("button", name="Применить").click()
             # self.page.get_by_role("button", name="Нет, выбрать другой").click()
             # self.page.get_by_role("link", name="Брянск").click()
             # time.sleep(10)
@@ -86,7 +96,7 @@ class Europa:
             print(traceback.format_exc())
 
     def view60(self):
-        """Делаем вывод товаров по 60 шт на странице"""
+        """УСТАРЕЛО. Делаем вывод товаров по 60 шт на странице"""
         self.page.goto('https://europa-market.ru/catalog/ot_evropy-2')
         self.page.wait_for_load_state('load')
         time.sleep(5)
@@ -149,7 +159,7 @@ class Europa:
 
     def start(self):
         self.set_city()
-        self.view60()
+        # self.view60()
         self.get_arts_from_catalogs()
 
 

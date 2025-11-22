@@ -67,7 +67,7 @@ class Europa:
             self.page.goto("https://europa-market.ru/", timeout=60000)
             self.page.wait_for_load_state('domcontentloaded')
 
-            # Логика установки города из твоего кода
+            # Логика установки города
             try:
                 self.page.get_by_role("button", name="Принять").click(timeout=5000)
             except:
@@ -82,7 +82,7 @@ class Europa:
             try:
                 self.page.get_by_text("Выберите доставка или самовывоз").nth(1).click()
             except:
-                # Альтернативный селектор, если верстка чуть плавает
+                # Альтернативный селектор
                 self.page.locator(".user-address").click()
 
             self.page.get_by_role("button", name="Самовывоз").click()
@@ -94,7 +94,6 @@ class Europa:
             time.sleep(5)
         except Exception as exp:
             print(f'{bcolors.FAIL}Ошибка при установке города:{bcolors.ENDC} {exp}')
-            # print(traceback.format_exc())
 
     def check_ddos(self, title):
         """Проверяем, сработала ли DDOS защита"""
@@ -102,15 +101,29 @@ class Europa:
             return True
         return False
 
+    def check_error_page(self):
+        """Проверяет, не попали ли мы на страницу 'Страница не найдена' (конец каталога)"""
+        try:
+            # Проверка на класс error-page из предоставленного HTML
+            if self.page.locator(".error-page").is_visible(timeout=2000):
+                return True
+            # Проверка на заголовок
+            if self.page.get_by_role("heading", name="Страница не найдена").is_visible(timeout=1000):
+                return True
+        except:
+            pass
+        return False
+
     def get_urls_from_page(self):
         # Ожидаем прогрузки карточек
         try:
             self.page.wait_for_selector('a.product-card__content', timeout=10000)
         except:
-            print("Товары на странице не найдены.")
-            return 0
+            # Если таймаут вышел, возможно товаров нет или это конец списка,
+            # это обработается проверкой длины списка ниже
+            pass
 
-        # Извлечение элементов карточек (ссылка-обертка)
+        # Извлечение элементов карточек
         product_elements = self.page.query_selector_all('a.product-card__content')
 
         combined_data = []
@@ -124,13 +137,12 @@ class Europa:
                 name = name_el.text_content().strip() if name_el else "No Name"
 
                 if link:
-                    # Извлекаем ID из ссылки (например, .../product/name-1301 -> 1301)
                     code = link.split('-')[-1]
                     full_url = f"https://europa-market.ru{link}"
 
                     combined_data.append(f"e_{code}\t{name}\t{full_url}")
                     count += 1
-            except Exception as e:
+            except Exception:
                 continue
 
         add_to_txt_file_url_product(combined_data)
@@ -139,27 +151,37 @@ class Europa:
     def paginator(self):
         """Проходим по страницам, нажимая кнопку 'Вперёд'"""
         while True:
+            # 1. Сначала проверяем, не страница ли это ошибки (конец каталога)
+            if self.check_error_page():
+                print(f'  -> {bcolors.WARNING}Достигнут конец списка (Страница не найдена).{bcolors.ENDC}')
+                break
+
+            # 2. Собираем товары
             count = self.get_urls_from_page()
             print(f'  -> Собрано товаров на странице {self.click}: {count}')
 
-            # Ищем кнопку "Вперёд" (по тексту внутри span)
-            # Используем locator с фильтром по тексту, чтобы точно попасть в кнопку пагинации
+            # Если на странице 0 товаров и это не страница ошибки - значит список пуст
+            if count == 0:
+                print(
+                    f'  -> {bcolors.WARNING}Товары на странице отсутствуют. Переход к следующему каталогу.{bcolors.ENDC}')
+                break
+
+            # 3. Ищем кнопку "Вперёд"
             next_btn = self.page.locator("a.pagination__page:has(span.pagination__page-text:text('Вперёд'))")
 
             if next_btn.count() > 0 and next_btn.is_visible():
                 self.click += 1
-                # Скроллим к кнопке, чтобы она была активна (иногда футер перекрывает)
                 next_btn.scroll_into_view_if_needed()
                 try:
                     next_btn.click()
-                    # Ждем загрузки следующей страницы (появление спиннера или обновление контента)
-                    time.sleep(4)
+                    # Увеличил паузу для надежности загрузки следующей страницы
+                    time.sleep(6)
                     self.page.wait_for_load_state('domcontentloaded')
                 except Exception as e:
                     print(f"Ошибка при переходе на следующую страницу: {e}")
                     break
             else:
-                print('  -> Это последняя страница.')
+                print('  -> Кнопка "Вперёд" не найдена. Это последняя страница.')
                 break
 
     def get_arts_from_catalogs(self):

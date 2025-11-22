@@ -65,9 +65,9 @@ class Europa:
         try:
             print('Устанавливаем город и адрес...')
             self.page.goto("https://europa-market.ru/", timeout=60000)
+            # Ждем загрузки, иногда бывают модалки
             self.page.wait_for_load_state('domcontentloaded')
 
-            # Логика установки города
             try:
                 self.page.get_by_role("button", name="Принять").click(timeout=5000)
             except:
@@ -78,7 +78,7 @@ class Europa:
             self.page.get_by_role("button", name="Выбрать").click()
             time.sleep(2)
 
-            # Открываем выбор адреса
+            # Открываем выбор адреса (клик по шапке адреса)
             try:
                 self.page.get_by_text("Выберите доставка или самовывоз").nth(1).click()
             except:
@@ -93,21 +93,20 @@ class Europa:
             print(f'{bcolors.OKGREEN}Адрес установлен: {ADDRESS_SHOP}{bcolors.ENDC}')
             time.sleep(5)
         except Exception as exp:
-            print(f'{bcolors.FAIL}Ошибка при установке города:{bcolors.ENDC} {exp}')
+            print(f'{bcolors.FAIL}Критическая ошибка при установке города:{bcolors.ENDC} {exp}')
 
     def check_ddos(self, title):
-        """Проверяем, сработала ли DDOS защита"""
         if title == 'DDoS-Guard':
             return True
         return False
 
     def check_error_page(self):
-        """Проверяет, не попали ли мы на страницу 'Страница не найдена' (конец каталога)"""
+        """Проверяет, не попали ли мы на страницу 'Страница не найдена' (конец пагинации)"""
         try:
-            # Проверка на класс error-page из предоставленного HTML
+            # Проверка по классу из твоего HTML
             if self.page.locator(".error-page").is_visible(timeout=2000):
                 return True
-            # Проверка на заголовок
+            # Проверка по тексту заголовка
             if self.page.get_by_role("heading", name="Страница не найдена").is_visible(timeout=1000):
                 return True
         except:
@@ -115,16 +114,15 @@ class Europa:
         return False
 
     def get_urls_from_page(self):
-        # Ожидаем прогрузки карточек
+        # Ждем появления сетки товаров
         try:
-            self.page.wait_for_selector('a.product-card__content', timeout=10000)
+            self.page.wait_for_selector('.category-products-list', timeout=10000)
         except:
-            # Если таймаут вышел, возможно товаров нет или это конец списка,
-            # это обработается проверкой длины списка ниже
             pass
 
-        # Извлечение элементов карточек
-        product_elements = self.page.query_selector_all('a.product-card__content')
+        # ! ВАЖНОЕ ИЗМЕНЕНИЕ: ищем товары ТОЛЬКО внутри блока каталога .category-products-list
+        # Это исключит товары из слайдеров "Вы смотрели" и "Популярное" внизу страницы
+        product_elements = self.page.query_selector_all('.category-products-list a.product-card__content')
 
         combined_data = []
         count = 0
@@ -132,14 +130,12 @@ class Europa:
         for element in product_elements:
             try:
                 link = element.get_attribute('href')
-                # Ищем название внутри карточки
                 name_el = element.query_selector('.product-card__title')
                 name = name_el.text_content().strip() if name_el else "No Name"
 
                 if link:
                     code = link.split('-')[-1]
                     full_url = f"https://europa-market.ru{link}"
-
                     combined_data.append(f"e_{code}\t{name}\t{full_url}")
                     count += 1
             except Exception:
@@ -149,33 +145,34 @@ class Europa:
         return count
 
     def paginator(self):
-        """Проходим по страницам, нажимая кнопку 'Вперёд'"""
+        """Проходим по страницам"""
         while True:
-            # 1. Сначала проверяем, не страница ли это ошибки (конец каталога)
+            # 1. Проверка на конец каталога (страница 404 внутри сайта)
             if self.check_error_page():
-                print(f'  -> {bcolors.WARNING}Достигнут конец списка (Страница не найдена).{bcolors.ENDC}')
+                print(f'  -> {bcolors.WARNING}Конец каталога (стр {self.click} не существует).{bcolors.ENDC}')
                 break
 
-            # 2. Собираем товары
+            # 2. Сбор данных
             count = self.get_urls_from_page()
-            print(f'  -> Собрано товаров на странице {self.click}: {count}')
+            print(f'  -> Страница {self.click}: собрано {count} товаров.')
 
-            # Если на странице 0 товаров и это не страница ошибки - значит список пуст
             if count == 0:
-                print(
-                    f'  -> {bcolors.WARNING}Товары на странице отсутствуют. Переход к следующему каталогу.{bcolors.ENDC}')
+                # Если товаров 0 и это не ошибка, возможно пустая категория
+                print('  -> Товаров нет, идем дальше.')
                 break
 
-            # 3. Ищем кнопку "Вперёд"
+            # 3. Переход на следующую страницу
+            # Ищем кнопку "Вперёд" по тексту внутри span
             next_btn = self.page.locator("a.pagination__page:has(span.pagination__page-text:text('Вперёд'))")
 
             if next_btn.count() > 0 and next_btn.is_visible():
                 self.click += 1
+                # Скроллим к кнопке, чтобы футер не перекрывал
                 next_btn.scroll_into_view_if_needed()
                 try:
                     next_btn.click()
-                    # Увеличил паузу для надежности загрузки следующей страницы
-                    time.sleep(6)
+                    # Пауза, чтобы Vue/Nuxt успел подгрузить новый контент
+                    time.sleep(5)
                     self.page.wait_for_load_state('domcontentloaded')
                 except Exception as e:
                     print(f"Ошибка при переходе на следующую страницу: {e}")
@@ -199,7 +196,7 @@ class Europa:
                 self.click = 1
                 self.paginator()
             except Exception as e:
-                print(f"Ошибка при обработке каталога {catalog}: {e}")
+                print(f"Ошибка в каталоге {catalog}: {e}")
                 continue
 
     def start(self):
@@ -210,14 +207,16 @@ class Europa:
 def main():
     t1 = datetime.datetime.now()
     print(f'Start: {t1}')
+    # Очистим файл перед стартом, чтобы не дублировать при перезапусках
+    # open('out/url_list_product.txt', 'w').close()
+
     try:
         with sync_playwright() as playwright:
             Europa(playwright=playwright).start()
-        print(f'Успешно завершено.')
+        print(f'Успешно.')
     except Exception as exp:
-        print(exp)
         print(traceback.format_exc())
-        send_logs_to_telegram(message=f'Произошла ошибка в step2!\n{exp}')
+        send_logs_to_telegram(message=f'Ошибка step2:\n{exp}')
     t2 = datetime.datetime.now()
     print(f'Finish: {t2}, TIME: {t2 - t1}')
     # send_logs_to_telegram(message=f'Step 2 Finish: {t2}, TIME: {t2 - t1}')

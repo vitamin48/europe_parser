@@ -27,6 +27,9 @@ OUTPUT_JSON_FILE = os.path.join("out", "data.json")
 OUTPUT_FAILED_FILE = os.path.join("out", "articles_with_bad_req.txt")
 DEBUG_DIR = os.path.join("out", "debug")
 
+BAD_BRANDS_FILE = os.path.join("in", "bad_brand.txt")
+TARGET_BRANDS_FILE = os.path.join("in", "target_brands.txt")
+
 ADDRESS_SHOP = 'Брянск-58, ул. Горбатова, 18'
 SHOP_INDEX_TO_CLICK = "241001"
 
@@ -38,62 +41,52 @@ RESTART_BROWSER_EVERY_N_URLS = 100
 
 # --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
 
-def send_logs_to_telegram(message):
-    pass
+def read_brands(filepath: str) -> list:
+    """Считывает бренды из файла в нижнем регистре для удобного сравнения"""
+    if not os.path.exists(filepath):
+        return []
+    with open(filepath, 'r', encoding='utf-8') as f:
+        return [line.strip().lower() for line in f if line.strip()]
+
+
+# Глобальные списки брендов
+BAD_BRANDS_LIST = read_brands(BAD_BRANDS_FILE)
+TARGET_BRANDS_LIST = read_brands(TARGET_BRANDS_FILE)
 
 
 def save_debug_info(page: Page, article_id: str):
-    """Сохраняет скриншот и HTML страницы при возникновении ошибки."""
-    print(f"{Fore.MAGENTA}!!! Сохраняю отладочную информацию для {article_id}...{Style.RESET_ALL}")
     os.makedirs(DEBUG_DIR, exist_ok=True)
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     screenshot_path = os.path.join(DEBUG_DIR, f"{article_id}_{timestamp}_debug.png")
     html_path = os.path.join(DEBUG_DIR, f"{article_id}_{timestamp}_debug.html")
     try:
         page.screenshot(path=screenshot_path, full_page=True)
-        print(f"{Fore.MAGENTA}  - Скриншот сохранен: {screenshot_path}{Style.RESET_ALL}")
         with open(html_path, 'w', encoding='utf-8') as f:
             f.write(page.content())
-        print(f"{Fore.MAGENTA}  - HTML-код сохранен: {html_path}{Style.RESET_ALL}")
-    except Exception as e:
-        print(f"{Fore.RED}  - Не удалось сохранить отладочную информацию: {e}{Style.RESET_ALL}")
+    except Exception:
+        pass
 
 
 def read_urls_from_file(filepath: str) -> list[str]:
-    """Читает ссылки из файла с диагностикой."""
     if not os.path.exists(filepath):
-        print(f"{Fore.RED}Файл {filepath} не найден!{Style.RESET_ALL}")
         return []
-
     urls = []
     with open(filepath, 'r', encoding='utf-8') as f:
         for line in f:
-            # Диагностика сырой строки
-            # print(f"DEBUG RAW LINE: {repr(line)}")
             parts = line.strip().split('\t')
             if len(parts) >= 3:
-                clean_url = parts[2].strip()
-                urls.append(clean_url)
+                urls.append(parts[2].strip())
             elif line.strip().startswith('http'):
-                clean_url = line.strip()
-                urls.append(clean_url)
-
+                urls.append(line.strip())
     unique_urls = list(dict.fromkeys(urls))
-    print(f"Загружено {len(unique_urls)} уникальных ссылок.")
-
-    if len(unique_urls) > 0:
-        print(f"Пример первой ссылки (проверка на скрытые символы): {repr(unique_urls[0])}")
-
     return unique_urls
 
 
 def load_existing_data(filepath: str) -> dict:
-    if not os.path.exists(filepath):
-        return {}
+    if not os.path.exists(filepath): return {}
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            return data
+            return json.load(f)
     except json.JSONDecodeError:
         return {}
 
@@ -119,43 +112,34 @@ def set_city(page):
         print('Устанавливаем город и адрес...')
         page.goto("https://europa-market.ru/", timeout=60000)
         page.wait_for_load_state('domcontentloaded')
-
         try:
             page.get_by_role("button", name="Принять").click(timeout=5000)
         except:
             pass
-
         try:
             page.get_by_role("button", name="Нет, выбрать другой город").click(timeout=3000)
         except:
             pass
-
         try:
             page.get_by_text("Брянск").click(timeout=3000)
             page.get_by_role("button", name="Выбрать").click(timeout=3000)
             time.sleep(2)
         except:
             pass
-
         try:
             page.get_by_text("Выберите доставка или самовывоз").nth(1).click(timeout=3000)
         except:
             page.locator(".user-address").click()
-
         try:
             page.get_by_role("button", name="Самовывоз").click()
             page.locator("div").filter(has_text=re.compile(r"^Нажмите, чтобы выбрать адрес$")).nth(1).click()
             page.get_by_text(SHOP_INDEX_TO_CLICK).click()
             page.get_by_role("button", name="Применить").click()
-            print(f'{Fore.GREEN}Адрес установлен: {ADDRESS_SHOP}{Style.RESET_ALL}')
             time.sleep(5)
             return True
-        except Exception as e:
-            print(f'{Fore.RED}Ошибка при выборе конкретного магазина: {e}{Style.RESET_ALL}')
+        except Exception:
             return False
-
-    except Exception as exp:
-        print(f'{Fore.RED}Критическая ошибка при установке города: {exp}{Style.RESET_ALL}')
+    except Exception:
         return False
 
 
@@ -167,54 +151,35 @@ def parse_product_page(page, product_url: str) -> dict | None:
     print(f"[DEBUG] Пытаюсь перейти на: {repr(product_url)}")
 
     try:
-        # Явный переход с ожиданием загрузки
-        response = page.goto(product_url, timeout=60000, wait_until="domcontentloaded")
-
-        # Диагностика ответа сервера
-        if response:
-            print(f"[DEBUG] Статус ответа сервера: {response.status}")
-        else:
-            print("[DEBUG] Ответ сервера: None (возможно, переход был прерван)")
-
+        page.goto(product_url, timeout=60000, wait_until="domcontentloaded")
     except Exception as e:
-        print(f"[DEBUG] Ошибка при выполнении page.goto: {e}")
         raise e
 
-    # 1. Проверка на 404
     try:
         if page.locator(".error-page").is_visible(timeout=2000) or \
                 page.get_by_role("heading", name="Страница не найдена").is_visible(timeout=500):
-            print(f"{Fore.YELLOW}  - Товар не найден (404).{Style.RESET_ALL}")
             log_failed_url(product_url, "404 Not Found", OUTPUT_FAILED_FILE)
             return None
     except:
         pass
 
-    # 2. Ожидание загрузки
     try:
         page.wait_for_selector('.product-title__name', timeout=10000)
     except TimeoutError:
-        print(f"{Fore.YELLOW}  - Не дождались загрузки карточки товара.{Style.RESET_ALL}")
-        # Сохраняем скриншот, чтобы понять, что видит браузер, если не видит заголовок
         save_debug_info(page, "timeout_error")
         log_failed_url(product_url, "Timeout loading card", OUTPUT_FAILED_FILE)
         return None
 
-    # 3. Сбор данных
     try:
         name = page.locator('.product-title__name').text_content().strip()
-
         try:
             price_text = page.locator('.product-cart__price-int').first.text_content().strip()
-            price_clean = price_text.replace(' ', '').replace('\xa0', '')
-            price = float(price_clean)
+            price = float(price_text.replace(' ', '').replace('\xa0', ''))
         except:
             price = 0.0
-            print(f"{Fore.YELLOW}  - Цена не найдена (возможно, нет в наличии).{Style.RESET_ALL}")
 
         characteristics_dict = {}
         description = ""
-
         keys = page.locator('.product-info__params-name').all()
         values = page.locator('.product-info__params-value').all()
 
@@ -225,17 +190,38 @@ def parse_product_page(page, product_url: str) -> dict | None:
                 if "описание" in key_text.lower():
                     description = val_text
                 characteristics_dict[key_text] = val_text
-        else:
-            print(f"{Fore.RED}  - Ошибка сбора характеристик (несовпадение полей).{Style.RESET_ALL}")
+
+        # --- НОВАЯ ЛОГИКА: ФИЛЬТРАЦИЯ ПО БРЕНДУ ---
+        extracted_brand = characteristics_dict.get('Бренд') or characteristics_dict.get('Торговая марка', '')
+        if extracted_brand:
+            brand_lower = str(extracted_brand).strip().lower()
+
+            # 1. Проверка по блек-листу (bad_brand.txt)
+            if any(b == brand_lower for b in BAD_BRANDS_LIST):
+                print(f"{Fore.YELLOW}  - Пропуск: Бренд '{extracted_brand}' в черном списке.{Style.RESET_ALL}")
+                log_failed_url(product_url, f"Bad brand: {extracted_brand}", OUTPUT_FAILED_FILE)
+                return None
+
+            # 2. Проверка по таргет-листу (target_brands.txt)
+            if TARGET_BRANDS_LIST:
+                is_target = False
+                for t in TARGET_BRANDS_LIST:
+                    if t in brand_lower or brand_lower in t:
+                        is_target = True
+                        break
+
+                if not is_target:
+                    print(
+                        f"{Fore.YELLOW}  - Пропуск: '{extracted_brand}' не целевой бренд (мусор из поиска).{Style.RESET_ALL}")
+                    log_failed_url(product_url, f"Not target brand: {extracted_brand}", OUTPUT_FAILED_FILE)
+                    return None
 
         image_links = []
         slider = page.locator('.product-image__image-slider')
         if slider.count() > 0:
-            imgs = slider.locator('img').all()
-            for img in imgs:
+            for img in slider.locator('img').all():
                 src = img.get_attribute('src')
-                if src:
-                    image_links.append(src)
+                if src: image_links.append(src)
         image_links = list(dict.fromkeys(image_links))
 
         return {
@@ -248,7 +234,6 @@ def parse_product_page(page, product_url: str) -> dict | None:
         }
 
     except Exception as e:
-        print(f"{Fore.RED}  - Ошибка парсинга полей: {e}{Style.RESET_ALL}")
         art = get_article_from_url(product_url) or "unknown"
         save_debug_info(page, art)
         raise e
@@ -269,12 +254,8 @@ def main():
             print(f"{Fore.YELLOW}Все товары уже собраны.{Style.RESET_ALL}")
             return
 
-        print(f"Осталось обработать: {Fore.CYAN}{len(urls_to_process)}{Style.RESET_ALL} товаров.")
-
         with sync_playwright() as p:
-            browser = None
-            context = None
-            page = None
+            browser, context, page = None, None, None
 
             def launch_browser_func():
                 nonlocal browser, context, page
@@ -283,22 +264,13 @@ def main():
                         browser.close()
                     except:
                         pass
-
-                print(f"{Fore.CYAN}\n--- Запуск браузера ---{Style.RESET_ALL}")
                 browser = p.chromium.launch(headless=HEADLESS_MODE, args=['--start-maximized'])
                 context = browser.new_context(viewport=None)
                 page = context.new_page()
-
-                # Подписка на сообщения консоли браузера для диагностики
-                # page.on("console", lambda msg: print(f"BROWSER CONSOLE: {msg.text}"))
-
                 page.add_init_script("Object.defineProperties(navigator, {webdriver:{get:()=>undefined}});")
-
-                if not set_city(page):
-                    print(f"{Fore.RED}Внимание! Город мог не установиться корректно.{Style.RESET_ALL}")
+                set_city(page)
 
             launch_browser_func()
-
             url_counter = 0
 
             with tqdm(total=len(urls_to_process), desc="Сбор данных", unit="tov") as pbar:
@@ -309,22 +281,16 @@ def main():
                         continue
 
                     pbar.set_description(f"Арт: {article_id}")
-
                     url_counter += 1
                     if url_counter % RESTART_BROWSER_EVERY_N_URLS == 0:
                         launch_browser_func()
 
                     product_data = None
-
                     for attempt in range(MAX_RETRIES):
                         try:
                             product_data = parse_product_page(page, url)
-                            if product_data is not None:
-                                break
-                            else:
-                                break
+                            break
                         except Exception as e:
-                            print(f"\n{Fore.RED}Ошибка {url}: {e}{Style.RESET_ALL}")
                             if attempt < MAX_RETRIES - 1:
                                 time.sleep(2)
                                 try:
@@ -345,11 +311,6 @@ def main():
 
             save_json_data(all_data, OUTPUT_JSON_FILE)
             if browser: browser.close()
-
-        end_time = datetime.datetime.now()
-        duration = end_time - start_time
-        print(f"{Fore.GREEN}Готово! Обработано за {str(duration).split('.')[0]}{Style.RESET_ALL}")
-        print(f"Всего товаров в базе: {len(all_data)}")
 
     except Exception as e:
         print(f"{Fore.RED}Критическая ошибка Main: {e}{Style.RESET_ALL}")

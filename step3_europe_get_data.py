@@ -27,8 +27,8 @@ OUTPUT_JSON_FILE = os.path.join("out", "data.json")
 OUTPUT_FAILED_FILE = os.path.join("out", "articles_with_bad_req.txt")
 DEBUG_DIR = os.path.join("out", "debug")
 
+# Подключаем только блек-лист
 BAD_BRANDS_FILE = os.path.join("in", "bad_brand.txt")
-TARGET_BRANDS_FILE = os.path.join("in", "target_brands.txt")
 
 ADDRESS_SHOP = 'Брянск-58, ул. Горбатова, 18'
 SHOP_INDEX_TO_CLICK = "241001"
@@ -41,17 +41,16 @@ RESTART_BROWSER_EVERY_N_URLS = 100
 
 # --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
 
-def read_brands(filepath: str) -> list:
-    """Считывает бренды из файла в нижнем регистре для удобного сравнения"""
+def read_bad_brands(filepath: str) -> list:
+    """Считывает бренды из черного списка в нижнем регистре"""
     if not os.path.exists(filepath):
         return []
     with open(filepath, 'r', encoding='utf-8') as f:
         return [line.strip().lower() for line in f if line.strip()]
 
 
-# Глобальные списки брендов
-BAD_BRANDS_LIST = read_brands(BAD_BRANDS_FILE)
-TARGET_BRANDS_LIST = read_brands(TARGET_BRANDS_FILE)
+# Загружаем черный список один раз при старте
+BAD_BRANDS_LIST = read_bad_brands(BAD_BRANDS_FILE)
 
 
 def save_debug_info(page: Page, article_id: str):
@@ -144,12 +143,6 @@ def set_city(page):
 
 
 def parse_product_page(page, product_url: str) -> dict | None:
-    """Парсит страницу товара."""
-
-    # --- ДИАГНОСТИКА ---
-    print(f"\n[DEBUG] Текущий URL браузера: {page.url}")
-    print(f"[DEBUG] Пытаюсь перейти на: {repr(product_url)}")
-
     try:
         page.goto(product_url, timeout=60000, wait_until="domcontentloaded")
     except Exception as e:
@@ -191,30 +184,17 @@ def parse_product_page(page, product_url: str) -> dict | None:
                     description = val_text
                 characteristics_dict[key_text] = val_text
 
-        # --- НОВАЯ ЛОГИКА: ФИЛЬТРАЦИЯ ПО БРЕНДУ ---
+        # --- ПРОВЕРКА ПО БЛЕК-ЛИСТУ (bad_brand.txt) ---
         extracted_brand = characteristics_dict.get('Бренд') or characteristics_dict.get('Торговая марка', '')
         if extracted_brand:
             brand_lower = str(extracted_brand).strip().lower()
 
-            # 1. Проверка по блек-листу (bad_brand.txt)
+            # Если бренд найден в черном списке - пропускаем товар
             if any(b == brand_lower for b in BAD_BRANDS_LIST):
-                print(f"{Fore.YELLOW}  - Пропуск: Бренд '{extracted_brand}' в черном списке.{Style.RESET_ALL}")
+                print(
+                    f"\n{Fore.YELLOW}  - Пропуск: Бренд '{extracted_brand}' находится в черном списке.{Style.RESET_ALL}")
                 log_failed_url(product_url, f"Bad brand: {extracted_brand}", OUTPUT_FAILED_FILE)
                 return None
-
-            # 2. Проверка по таргет-листу (target_brands.txt)
-            if TARGET_BRANDS_LIST:
-                is_target = False
-                for t in TARGET_BRANDS_LIST:
-                    if t in brand_lower or brand_lower in t:
-                        is_target = True
-                        break
-
-                if not is_target:
-                    print(
-                        f"{Fore.YELLOW}  - Пропуск: '{extracted_brand}' не целевой бренд (мусор из поиска).{Style.RESET_ALL}")
-                    log_failed_url(product_url, f"Not target brand: {extracted_brand}", OUTPUT_FAILED_FILE)
-                    return None
 
         image_links = []
         slider = page.locator('.product-image__image-slider')
